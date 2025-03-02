@@ -1,13 +1,37 @@
 
 
 ## Notes
+### 2025-03-02
+- Ollama
+see https://docs.ag2.ai/docs/user-guide/models/ollama
+and `~/projects/wgong/AG2/ag2/notebook/u8hi_agents/readme-ollama.md`
+
+#### AG2 Refrence Agents
+see https://docs.ag2.ai/docs/user-guide/reference-agents/index
+
+##### [Captain Agent](https://docs.ag2.ai/docs/user-guide/reference-agents/captainagent)
+
+
+##### [Communication Agent](https://docs.ag2.ai/docs/user-guide/reference-agents/communication-agents)
+
+https://docs.ag2.ai/docs/blog/2025-02-05-Communication-Agents/index
+
+- Discord
+- Slack
+- Telegram
+
+### 2025-03-01
+
+raised another issue: https://github.com/ag2ai/ag2/issues/1198
+**DocAgent made redundant calls**
+
 ### 2025-02-27
 
 Encounter an issue: https://github.com/ag2ai/ag2/issues/1167
 when trying to run `agents_docagent_u8hi.ipynb`
 
 
-### 2025-02-28
+### 2025-02-27
 
 - review following PR:
 https://github.com/ag2ai/ag2/pull/1184/files#diff-fc2123ae2f1cbab54611a85d722df2e9fb7b59c6246920b1f83901b7899aa930

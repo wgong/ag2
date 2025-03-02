@@ -13,7 +13,10 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Optional, Union
 
-from ..code_utils import content_str
+from ..code_utils import (
+    DEFAULT_MAX_TURNS,
+    content_str,
+)
 from ..doc_utils import export_module
 from ..exception_utils import AgentNameConflictError, NoEligibleSpeakerError, UndefinedNextAgentError
 from ..graph_utils import check_graph_validity, invert_disallowed_to_allowed
@@ -762,7 +765,7 @@ class GroupChat:
             speaker_selection_agent,
             cache=None,  # don't use caching for the speaker selection chat
             message=start_message,
-            max_turns=2
+            max_turns=DEFAULT_MAX_TURNS
             * max(1, max_attempts),  # Limiting the chat to the number of attempts, including the initial one
             clear_history=False,
             silent=not self.select_speaker_auto_verbose,  # Base silence on the verbose attribute
@@ -845,7 +848,7 @@ class GroupChat:
             speaker_selection_agent,
             cache=None,  # don't use caching for the speaker selection chat
             message=start_message,
-            max_turns=2
+            max_turns=DEFAULT_MAX_TURNS
             * max(1, max_attempts),  # Limiting the chat to the number of attempts, including the initial one
             clear_history=False,
             silent=not self.select_speaker_auto_verbose,  # Base silence on the verbose attribute

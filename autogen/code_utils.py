@@ -24,8 +24,10 @@ from . import oai
 from .types import UserMessageImageContentPart, UserMessageTextContentPart
 
 SENTINEL = object()
-DEFAULT_MODEL = "gpt-4"
+DEFAULT_MODEL = "gpt-4o-mini"   # "gpt-4"
 FAST_MODEL = "gpt-3.5-turbo"
+DEFAULT_MAX_TURNS = 3           # prevent run-away chats
+
 # Regular expression for finding a code block
 # ```[ \t]*(\w+)?[ \t]*\r?\n(.*?)[ \t]*\r?\n``` Matches multi-line code blocks.
 #   The [ \t]* matches the potential spaces before language name.

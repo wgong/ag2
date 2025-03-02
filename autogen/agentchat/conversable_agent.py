@@ -29,6 +29,7 @@ from typing import (
 
 from ..cache.cache import AbstractCache
 from ..code_utils import (
+    DEFAULT_MAX_TURNS,
     PYTHON_VARIANTS,
     UNKNOWN,
     check_can_use_docker_or_throw,
@@ -64,6 +65,7 @@ from .chat import ChatResult, _post_process_carryover_item, a_initiate_chats, in
 from .utils import consolidate_chat_info, gather_usage_summary
 
 __all__ = ("ConversableAgent",)
+
 
 logger = logging.getLogger(__name__)
 
@@ -1377,7 +1379,7 @@ class ConversableAgent(LLMAgent):
         clear_history: bool = True,
         silent: Optional[bool] = False,
         cache: Optional[AbstractCache] = None,
-        max_turns: Optional[int] = None,
+        max_turns: Optional[int] = DEFAULT_MAX_TURNS,
         summary_method: Optional[Union[str, Callable[..., Any]]] = DEFAULT_SUMMARY_METHOD,
         summary_args: Optional[dict[str, Any]] = {},
         message: Optional[Union[dict[str, Any], str, Callable[..., Any]]] = None,
@@ -1520,7 +1522,7 @@ class ConversableAgent(LLMAgent):
         clear_history: bool = True,
         silent: Optional[bool] = False,
         cache: Optional[AbstractCache] = None,
-        max_turns: Optional[int] = None,
+        max_turns: Optional[int] = DEFAULT_MAX_TURNS,
         summary_method: Optional[Union[str, Callable[..., Any]]] = DEFAULT_SUMMARY_METHOD,
         summary_args: Optional[dict[str, Any]] = {},
         message: Optional[Union[str, Callable[..., Any]]] = None,
@@ -3365,7 +3367,7 @@ class ConversableAgent(LLMAgent):
         *,
         tools: Optional[Union[Tool, Iterable[Tool]]] = None,
         executor_kwargs: Optional[dict[str, Any]] = None,
-        max_turns: Optional[int] = None,
+        max_turns: Optional[int] = DEFAULT_MAX_TURNS,
         msg_to: Literal["agent", "user"] = "agent",
         clear_history: bool = False,
         user_input: bool = True,
@@ -3415,7 +3417,7 @@ class ConversableAgent(LLMAgent):
         *,
         tools: Optional[Union[Tool, Iterable[Tool]]] = None,
         executor_kwargs: Optional[dict[str, Any]] = None,
-        max_turns: Optional[int] = None,
+        max_turns: Optional[int] = DEFAULT_MAX_TURNS,
         msg_to: Literal["agent", "user"] = "agent",
         clear_history: bool = False,
         user_input: bool = True,
