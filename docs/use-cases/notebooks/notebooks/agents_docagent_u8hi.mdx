@@ -1,0 +1,2680 @@
+---
+custom_edit_url: https://github.com/ag2ai/ag2/edit/main/notebook/agents_docagent_u8hi.ipynb
+description: Query documents and web pages with DocAgent
+source_notebook: /notebook/agents_docagent_u8hi.ipynb
+tags:
+- agents
+- documents
+- RAG
+- docagent
+title: RAG with DocAgent
+---
+
+<a href="https://colab.research.google.com/github/ag2ai/ag2/blob/main/notebook/agents_docagent_u8hi.ipynb" class="colab-badge" target="_blank"><img noZoom src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab" /></a>
+<a href="https://github.com/ag2ai/ag2/blob/main/notebook/agents_docagent_u8hi.ipynb" class="github-badge" target="_blank"><img noZoom src="https://img.shields.io/badge/Open%20on%20GitHub-grey?logo=github" alt="Open on GitHub" /></a>
+
+
+
+
+In this notebook, see how DocAgent, through natural language, can
+
+1.  Ingest documents from a local file or URL
+2.  and answer questions with RAG capability
+
+### Installation
+
+To get started with the document agent integration in AG2, follow these
+steps:
+
+Install AG2 with the `rag` extra:
+
+```bash
+pip install ag2[rag]
+```
+
+Notes:
+
+1.  DocAgent only queries ingested documents, this ensures that it won’t
+    make up information if it can’t find it.
+2.  Answers may not be accurate for documents that cannot be parsed
+    correctly to Markdown format.
+
+You’re all set! Now you can start using DocAgent feature in AG2.
+
+## Documents supported
+
+The following documents can be ingested: - PDF - IMAGE - DOCX - HTML -
+PPTX - ASCIIDOC - MD
+
+You can also have the DocAgent use a web page by giving it a URL to
+ingest.
+
+## Inside the DocAgent
+
+![](docagent_swarm.png)
+
+Before jumping into the code, let’s have a look at the swarm inside the
+DocAgent.
+
+The swarm contains the following agents:
+
+-   **Triage Agent**: Decides what type of task to perform from user
+    requests.
+-   **Task Manager Agent**: Manages the tasks and initiates actions.
+-   **Data Ingestion Agent**: Ingests the documents.
+-   **Query Agent**: Answers user questions based on ingested documents.
+-   **Error Agent**: If anything fails, the error agent will report the
+    problem back.
+-   **Summary Agent**: Generates a summary of the completed tasks.
+
+When it is the DocAgent’s turn to reply, the DocAgent initializes the
+agents and sets up the context variables, then:
+
+1.  **Triage User Requests**: The `Triage Agent` categorizes the tasks
+    into ingestions and queries.
+2.  **Task Management**: The `Task Manager Agent` manages the tasks and
+    ensures they are executed in the correct sequence.
+3.  **Data Ingestion**: The `Data Ingestion Agent` processes any
+    document ingesting tasks.
+4.  **Query Execution**: The `Query Agent` answers any user queries.
+5.  **Summary Generation**: The `Summary Agent` generates a summary of
+    the completed tasks.
+
+The swarm is dynamic in that if only a data ingestation task is
+required, it will do that. Similarly for queries. This allows you to use
+the DocAgent many times covering the needs of ingesting, querying, or
+doing both at the same time.
+
+## Code example
+
+```python
+import os
+
+import autogen
+from autogen import AfterWorkOption, ConversableAgent, initiate_swarm_chat
+from autogen.agents.experimental import DocAgent
+```
+
+
+```python
+def get_api_key(key_name="OPENAI/Yiwen"):
+    from api_key_store import ApiKeyStore
+    return ApiKeyStore().get_api_key(key_name)
+```
+
+
+```python
+os.environ["OPENAI_API_KEY"] = get_api_key()
+```
+
+# Load configuration from the OAI_CONFIG_LIST file, requires the api_key to exist in the configuration
+
+config_list = autogen.config_list_from_json(
+“../OAI_CONFIG_LIST_u8hi.json”, filter_dict={ “model”: \[“gpt-4o”\], },
+)
+
+# Set the OPENAI_API_KEY from the configuration so that the internal ingestion can use it
+
+os.environ\[“OPENAI_API_KEY”\] = config_list\[0\]\[“api_key”\]
+
+llm_config = { “config_list”: config_list, }
+
+```python
+model_id = "gpt-4o-mini"
+```
+
+
+```python
+config_list = [
+    {
+        "model": model_id,
+        "api_key": get_api_key(),
+    },
+]
+llm_config = {
+    "config_list": config_list,
+}
+```
+
+### Ingesting local documents and answering questions
+
+```python
+# Create a document agent and ask them to ingest the document and answer the question
+document_agent = DocAgent(llm_config=llm_config, collection_name="toast_report")
+document_agent.run(
+    "could you ingest ../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf? What is the fiscal year 2024 financial summary?",
+    max_turns=1,
+)
+```
+
+``` text
+INFO:chromadb.telemetry.product.posthog:Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+INFO:autogen.agents.experimental.document_agent.docling_query_engine:Creating new collection toast_report in the database.
+```
+
+``` text
+user (to DocAgent):
+
+could you ingest ../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf? What is the fiscal year 2024 financial summary?
+
+--------------------------------------------------------------------------------
+_User (to chat_manager):
+
+could you ingest ../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf? What is the fiscal year 2024 financial summary?
+
+--------------------------------------------------------------------------------
+
+Next speaker: DocumentTriageAgent
+
+DocumentTriageAgent (to chat_manager):
+
+{"ingestions":[{"path_or_url":"../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf"}],"queries":[{"query_type":"RAG_QUERY","query":"What is the fiscal year 2024 financial summary?"}]}
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_m1UFBPY2u2EvIzhbSZ3HmLx9): initiate_tasks *****
+Arguments: 
+{"ingestions":[{"path_or_url":"../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf"}],"queries":[{"query_type":"RAG_QUERY","query":"What is the fiscal year 2024 financial summary?"}]}
+*******************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION initiate_tasks...
+Call ID: call_m1UFBPY2u2EvIzhbSZ3HmLx9
+Input arguments: {'ingestions': [{'path_or_url': '../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf'}], 'queries': [{'query_type': 'RAG_QUERY', 'query': 'What is the fiscal year 2024 financial summary?'}], 'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [], 'DocumentsIngested': [], 'QueriesToRun': [], 'QueryResults': []}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_agent:initiate_tasks context_variables
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_m1UFBPY2u2EvIzhbSZ3HmLx9) *****
+Updated context variables with task decisions
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_rR8fcWNlFEjVh9OWVXDRpPwm): transfer_TaskManagerAgent_to_DoclingDocIngestAgent *****
+Arguments: 
+{}
+*******************************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_DoclingDocIngestAgent...
+Call ID: call_rR8fcWNlFEjVh9OWVXDRpPwm
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_rR8fcWNlFEjVh9OWVXDRpPwm) *****
+Swarm agent --> DoclingDocIngestAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: DoclingDocIngestAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+DoclingDocIngestAgent (to chat_manager):
+
+***** Suggested tool call (call_yxRcfqfYoZ0omOnwkD5Xefh9): data_ingest_task *****
+Arguments: 
+{}
+*********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION data_ingest_task...
+Call ID: call_yxRcfqfYoZ0omOnwkD5Xefh9
+Input arguments: {'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [{'path_or_url': '../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf'}], 'DocumentsIngested': [], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What is the fiscal year 2024 financial summary?'}], 'QueryResults': [], 'TaskInitiated': True}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_utils:Error when checking if ../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf is a valid URL: Invalid URL.
+INFO:autogen.agents.experimental.document_agent.document_utils:Detected file. Returning file path...
+INFO:docling.document_converter:Going to convert document batch...
+/home/papagame/anaconda3/envs/ag2/lib/python3.11/site-packages/docling/models/easyocr_model.py:63: UserWarning: Deprecated field. Better to set the `accelerator_options.device` in `pipeline_options`. When `use_gpu and accelerator_options.device == AcceleratorDevice.CUDA` the GPU is used to run EasyOCR. Otherwise, EasyOCR runs in CPU.
+  warnings.warn(
+WARNING:easyocr.easyocr:Downloading detection model, please wait. This may take several minutes depending upon your network connection.
+INFO:easyocr.easyocr:Download complete
+WARNING:easyocr.easyocr:Downloading recognition model, please wait. This may take several minutes depending upon your network connection.
+INFO:easyocr.easyocr:Download complete.
+INFO:docling.utils.accelerator_utils:Accelerator device: 'cuda:0'
+/home/papagame/anaconda3/envs/ag2/lib/python3.11/site-packages/torch/utils/cpp_extension.py:2059: UserWarning: TORCH_CUDA_ARCH_LIST is not set, all archs for visible cards are included for compilation. 
+If this is not desired, please set os.environ['TORCH_CUDA_ARCH_LIST'].
+  warnings.warn(
+INFO:docling.utils.accelerator_utils:Accelerator device: 'cuda:0'
+INFO:docling.pipeline.base_pipeline:Processing document Toast_financial_report.pdf
+INFO:docling.document_converter:Finished converting document Toast_financial_report.pdf in 64.66 sec.
+INFO:autogen.agents.experimental.document_agent.parser_utils:Document converted in 64.66 seconds.
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Document Toast_financial_report.pdf converted.
+Saved markdown output to: /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:item-0 at level 0: unspecified: group _root_
+  item-1 at level 1: text: Table of Contents
+  item-2 at level 1: section_header: UNITED STATES
+  item-3 at level 1: section_header: SECUR ...  COMMISSION
+  item-4 at level 1: text: Washi ...  D.C. 20549
+  item-5 at level 1: section_header: FORM 10-Q
+  item-6 at level 1: text: (Mark One)
+  item-7 at level 1: text: ☒ QUA ... ACT OF 1934
+  item-8 at level 1: text: For t ... er 30, 2024
+  item-9 at level 1: text: OR
+  item-10 at level 1: text: ☐ TRA ... ACT OF 1934
+  item-11 at level 1: text: For t ... iod from to
+  item-12 at level 1: text: Commi ... r 001-40819
+  item-13 at level 1: section_header: Toast, Inc.
+  item-14 at level 1: text: (Exac ... ts charter)
+  item-15 at level 1: section_header: Delaware
+  item-16 at level 1: section_header: 45-4168768
+  item-17 at level 1: text: (Stat ... ganization)
+  item-18 at level 1: section_header: 333 S ... ssachusetts
+  item-19 at level 1: text: (Addr ... ve offices)
+  item-20 at level 1: section_header: (617) 297-1005
+  item-21 at level 1: text: (Regi ...  area code)
+  item-22 at level 1: text: Secur ... of the Act:
+  item-23 at level 1: table with [2x3]
+  item-24 at level 1: text: Indic ...  Yes ☒ No ☐
+  item-25 at level 1: text: Indic ...  Yes ☒ No ☐
+  item-26 at level 1: text: Indic ... change Act.
+  item-27 at level 1: text: Large ... rated filer
+  item-28 at level 1: text: ☒
+  item-29 at level 1: text: Accelerated filer
+  item-30 at level 1: checkbox_unselected: ☐
+  item-31 at level 1: text: Non-a ... rated filer
+  item-32 at level 1: checkbox_unselected: ☐
+  item-33 at level 1: text: Small ... g company ☐
+  item-34 at level 1: text: Emerg ... wth company
+  item-35 at level 1: checkbox_unselected: ☐
+  item-36 at level 1: text: with  ... change Act.
+  item-37 at level 1: text: ☐
+  item-38 at level 1: text: (I.R. ... cation No.)
+  item-39 at level 1: text: 02210
+  item-40 at level 1: text: (Zip code)
+  item-41 at level 1: text: Table of Contents
+  item-42 at level 1: section_header: TABLE OF CONTENTS
+  item-43 at level 1: document_index with [21x3]
+  item-44 at level 1: text: Table of Contents
+  item-45 at level 1: section_header: Item  ...  Statements
+  item-46 at level 1: section_header: PART  ... INFORMATION
+  item-47 at level 1: section_header: TOAST, INC.
+  item-48 at level 1: section_header: CONDE ... ANCE SHEETS
+  item-49 at level 1: text: (unaudited)
+  item-50 at level 1: text: (in m ... re amounts)
+  item-51 at level 1: table with [37x3]
+  item-52 at level 1: text: The a ... statements.
+  item-53 at level 1: text: Table of Contents
+  item-54 at level 1: section_header: TOAST, INC.
+  item-55 at level 1: section_header: CONDE ...  OPERATIONS
+  item-56 at level 1: text: (unaudited)
+  item-57 at level 1: text: (in m ... re amounts)
+  item-58 at level 1: table with [34x5]
+  item-59 at level 1: text: The a ... statements.
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_yxRcfqfYoZ0omOnwkD5Xefh9) *****
+Data Ingestion Task Failed, Error 'ascii' codec can't encode character '\u2612' in position 126: ordinal not in range(128): '../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf'
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: ErrorManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+ErrorManagerAgent (to chat_manager):
+
+The following error(s) have occurred:
+- Data Ingestion Task Failed, Error 'ascii' codec can't encode character '\u2612' in position 126: ordinal not in range(128): '../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf'
+
+--------------------------------------------------------------------------------
+DocAgent (to user):
+
+The following error(s) have occurred:
+- Data Ingestion Task Failed, Error 'ascii' codec can't encode character '\u2612' in position 126: ordinal not in range(128): '../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf'
+
+--------------------------------------------------------------------------------
+```
+
+``` text
+ChatResult(chat_id=None, chat_history=[{'content': 'could you ingest ../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf? What is the fiscal year 2024 financial summary?', 'role': 'assistant', 'name': 'user'}, {'content': "The following error(s) have occurred:\n- Data Ingestion Task Failed, Error 'ascii' codec can't encode character '\\u2612' in position 126: ordinal not in range(128): '../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf'", 'role': 'user', 'name': 'DocAgent'}], summary="The following error(s) have occurred:\n- Data Ingestion Task Failed, Error 'ascii' codec can't encode character '\\u2612' in position 126: ordinal not in range(128): '../test/agentchat/contrib/graph_rag/Toast_financial_report.pdf'", cost={'usage_including_cached_inference': {'total_cost': 0}, 'usage_excluding_cached_inference': {'total_cost': 0}}, human_input=[])
+```
+
+reported issue - https://github.com/ag2ai/ag2/issues/1167
+
+### Fetching a webpage and answering questions
+
+```python
+# Create a document agent and ask them to summarize a web page article
+document_agent = DocAgent(llm_config=llm_config, collection_name="news_reports")
+document_agent.run(
+    "could you read 'https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html' and summarize the article?",
+    max_turns=1,
+)
+```
+
+``` text
+INFO:chromadb.telemetry.product.posthog:Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+INFO:autogen.agents.experimental.document_agent.docling_query_engine:Using existing collection news_reports from the database.
+```
+
+``` text
+user (to DocAgent):
+
+could you read 'https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html' and summarize the article?
+
+--------------------------------------------------------------------------------
+_User (to chat_manager):
+
+could you read 'https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html' and summarize the article?
+
+--------------------------------------------------------------------------------
+
+Next speaker: DocumentTriageAgent
+
+DocumentTriageAgent (to chat_manager):
+
+{"ingestions":[{"path_or_url":"https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html"}],"queries":[{"query_type":"RAG_QUERY","query":"Summarize the article about changes in Earth's core from the provided URL."}]}
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_7yF2WXh2N1TatL2zaYPDzjf1): initiate_tasks *****
+Arguments: 
+{"ingestions":[{"path_or_url":"https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html"}],"queries":[{"query_type":"RAG_QUERY","query":"Summarize the article about changes in Earth's core from the provided URL."}]}
+*******************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION initiate_tasks...
+Call ID: call_7yF2WXh2N1TatL2zaYPDzjf1
+Input arguments: {'ingestions': [{'path_or_url': 'https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html'}], 'queries': [{'query_type': 'RAG_QUERY', 'query': "Summarize the article about changes in Earth's core from the provided URL."}], 'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [], 'DocumentsIngested': [], 'QueriesToRun': [], 'QueryResults': []}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_agent:initiate_tasks context_variables
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_7yF2WXh2N1TatL2zaYPDzjf1) *****
+Updated context variables with task decisions
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_DznTgsmIYCxIlivFKj8c1lMp): transfer_TaskManagerAgent_to_DoclingDocIngestAgent *****
+Arguments: 
+{}
+*******************************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_DoclingDocIngestAgent...
+Call ID: call_DznTgsmIYCxIlivFKj8c1lMp
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_DznTgsmIYCxIlivFKj8c1lMp) *****
+Swarm agent --> DoclingDocIngestAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: DoclingDocIngestAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+DoclingDocIngestAgent (to chat_manager):
+
+***** Suggested tool call (call_myCghcBFOGBtGiEdW603eqjN): data_ingest_task *****
+Arguments: 
+{}
+*********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION data_ingest_task...
+Call ID: call_myCghcBFOGBtGiEdW603eqjN
+Input arguments: {'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [{'path_or_url': 'https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html'}], 'DocumentsIngested': [], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': "Summarize the article about changes in Earth's core from the provided URL."}], 'QueryResults': [], 'TaskInitiated': True}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_utils:Detected URL. Downloading content...
+INFO:WDM:====== WebDriver manager ======
+INFO:WDM:Get LATEST chromedriver version for google-chrome
+INFO:WDM:Get LATEST chromedriver version for google-chrome
+INFO:WDM:Get LATEST chromedriver version for google-chrome
+INFO:WDM:WebDriver version 133.0.6943.141 selected
+INFO:WDM:Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/133.0.6943.141/linux64/chromedriver-linux64.zip
+INFO:WDM:About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/133.0.6943.141/linux64/chromedriver-linux64.zip
+INFO:WDM:Driver downloading response is 200
+INFO:WDM:Get LATEST chromedriver version for google-chrome
+INFO:WDM:Driver has been saved in cache [/home/papagame/.wdm/drivers/chromedriver/linux64/133.0.6943.141]
+INFO:docling.document_converter:Going to convert document batch...
+INFO:docling.pipeline.base_pipeline:Processing document earth-core-inner-shape-change-b2695585.html
+WARNING:docling.backend.html_backend:list-item has no text: <li class="sc-16d5z5s-1 jKEmdI"><a aria-label="Visit The Independent on Facebook" class="sc-16d5z5s-2 blzGVC fb-link" href="https://www.facebook.com/TheIndependentOnline" rel="noopener"><svg id="b941eb1404da3df8" viewbox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M13.5 31.83q1.02.16 2.09.2h.84q1.06-.04 2.07-.2v-11.2h3.73l.7-4.62H18.5v-3c0-1.27.62-2.5 2.6-2.5h2.02V6.56s-1.83-.31-3.58-.31c-3.65 0-6.04 2.21-6.04 6.22V16H9.44v4.63h4.06z"></path></svg></a><a aria-label="Visit The Independent on Twitter" class="sc-16d5z5s-2 blzGVC x-link" href="https://twitter.com/Independent" rel="noopener"><svg data-name="Layer 2" id="Layer_2-3f443091285db5b7" viewbox="0 0 23.95 23.97" xmlns="http://www.w3.org/2000/svg"><path d="M14.28 10.17 23.2 0h-2.11l-7.75 8.83L7.16 0H0l9.38 13.34L0 24h2.14l8.17-9.31L16.84 24H24Zm-2.89 3.29-1-1.33L2.9 1.57h3.24l6.09 8.53.95 1.32 7.91 11.08h-3.25Z"></path></svg></a></li>
+WARNING:docling.backend.html_backend:list-item has no text: <li class="sc-2grh3o-1 dVptiL"><a class="sc-2grh3o-2 bqyBxb" id="privacy-settings" style="display: none;"></a></li>
+INFO:docling.document_converter:Finished converting document earth-core-inner-shape-change-b2695585.html in 0.06 sec.
+INFO:autogen.agents.experimental.document_agent.parser_utils:Document converted in 0.06 seconds.
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Document earth-core-inner-shape-change-b2695585.html converted.
+Saved markdown output to: /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:item-0 at level 0: unspecified: group _root_
+  item-1 at level 1: list: group list
+    item-2 at level 2: list_item: News News
+      item-3 at level 3: list: group list
+        item-4 at level 4: list_item: News
+        item-5 at level 4: list_item: US
+        item-6 at level 4: list_item: UK
+        item-7 at level 4: list_item: Europe
+        item-8 at level 4: list_item: World
+        item-9 at level 4: list_item: US Politics
+        item-10 at level 4: list_item: UK Politics
+        item-11 at level 4: list_item: Health
+        item-12 at level 4: list_item: Business
+        item-13 at level 4: list_item: Money
+        item-14 at level 4: list_item: Science
+        item-15 at level 4: list_item: Space
+        item-16 at level 4: list_item: News Videos
+    item-17 at level 2: list_item: Sports Sports
+      item-18 at level 3: list: group list
+        item-19 at level 4: list_item: Sports
+        item-20 at level 4: list_item: US Sports
+        item-21 at level 4: list_item: Soccer
+        item-22 at level 4: list_item: Formula 1
+        item-23 at level 4: list_item: UFC
+        item-24 at level 4: list_item: Rugby Union
+        item-25 at level 4: list_item: Cricket
+        item-26 at level 4: list_item: Tennis
+        item-27 at level 4: list_item: Boxing
+        item-28 at level 4: list_item: Cycling
+        item-29 at level 4: list_item: Golf
+        item-30 at level 4: list_item: Sports Videos
+    item-31 at level 2: list_item: Voices Voices
+      item-32 at level 3: list: group list
+        item-33 at level 4: list_item: Voices
+        item-34 at level 4: list_item: Editorials
+        item-35 at level 4: list_item: Letters
+    item-36 at level 2: list_item: Culture Culture
+      item-37 at level 3: list: group list
+        item-38 at level 4: list_item: Culture
+        item-39 at level 4: list_item: Movies
+        item-40 at level 4: list_item: TV & Radio
+        item-41 at level 4: list_item: Music
+        item-42 at level 4: list_item: Games
+        item-43 at level 4: list_item: Books
+        item-44 at level 4: list_item: Art
+        item-45 at level 4: list_item: Photography
+        item-46 at level 4: list_item: Theatre & Dance
+        item-47 at level 4: list_item: Culture Videos
+    item-48 at level 2: list_item: Lifestyle Lifestyle
+      item-49 at level 3: list: group list
+        item-50 at level 4: list_item: Lifestyle
+        item-51 at level 4: list_item: Tech
+        item-52 at level 4: list_item: Food & Drink
+        item-53 at level 4: list_item: Fashion
+        item-54 at level 4: list_item: Love & Sex
+        item-55 at level 4: list_item: Women
+        item-56 at level 4: list_item: Health & Families
+        item-57 at level 4: list_item: Royal Family
+        item-58 at level 4: list_item: Motoring
+        item-59 at level 4: list_item: Electric Vehicles
+        item-60 at level 4: list_item: Lifestyle Videos
+    item-61 at level 2: list_item: Travel Travel
+      item-62 at level 3: list: group list
+        item-63 at level 4: list_item: Travel
+        item-64 at level 4: list_item: News & Advice
+        item-65 at level 4: list_item: Simon Calder
+        item-66 at level 4: list_item: USA
+        item-67 at level 4: list_item: UK
+        item-68 at level 4: list_item: Europe
+        item-69 at level 4: list_item: Asia
+        item-70 at level 4: list_item: Inspiration
+        item-71 at level 4: list_item: City Guides
+        item-72 at level 4: list_item: Sustainable Travel
+    item-73 at level 2: list_item: Premium Premium
+      item-74 at level 3: list: group list
+        item-75 at level 4: list_item: Premium
+        item-76 at level 4: list_item: Editorials
+        item-77 at level 4: list_item: Voices
+        item-78 at level 4: list_item: Long Reads
+        item-79 at level 4: list_item: Politics Explained
+        item-80 at level 4: list_item: News Analysis
+  item-81 at level 1: paragraph: More
+  item-82 at level 1: list: group list
+    item-83 at level 2: list_item: Home & Garden
+    item-84 at level 2: list_item: Tech
+    item-85 at level 2: list_item: Fashion & Beauty
+    item-86 at level 2: list_item: Food & Drink
+    item-87 at level 2: list_item: Kids
+    item-88 at level 2: list_item: Books
+    item-89 at level 2: list_item: Travel & Outdoors
+    item-90 at level 2: list_item: Sports & Fitness
+    item-91 at level 2: list_item: Deals
+  item-92 at level 1: list: group list
+    item-93 at level 2: list_item: News
+    item-94 at level 2: list_item: Climate 100
+    item-95 at level 2: list_item: Voices
+    item-96 at level 2: list_item: Sustainable Living
+    item-97 at level 2: list_item: Explained
+    item-98 at level 2: list_item: Climate Videos
+    item-99 at level 2: list_item: Electric Vehicles
+    item-100 at level 2: list_item: SGI
+  item-101 at level 1: list: group list
+    item-102 at level 2: list_item: Behind The Headlines
+    item-103 at level 2: list_item: On The Ground
+    item-104 at level 2: list_item: Decomplicated
+    item-105 at level 2: list_item: You A ... e Questions
+    item-106 at level 2: list_item: Binge Watch
+    item-107 at level 2: list_item: Music Box
+    item-108 at level 2: list_item: Love Lives
+    item-109 at level 2: list_item: Travel Smart
+    item-110 at level 2: list_item: Watch on your TV
+  item-111 at level 1: list: group list
+    item-112 at level 2: list_item: Indy100
+    item-113 at level 2: list_item: Crosswords & Puzzles
+    item-114 at level 2: list_item: Most Commented
+    item-115 at level 2: list_item: Newsletters
+    item-116 at level 2: list_item: Ask Me Anything
+    item-117 at level 2: list_item: Virtual Events
+    item-118 at level 2: list_item: Deals
+  item-119 at level 1: section: group header-1
+    item-120 at level 2: section: group header-2
+      item-121 at level 3: section_header: Thank ... registering
+        item-122 at level 4: paragraph: Pleas ... e logged in
+  item-123 at level 1: title: Somet ... entists say
+    item-124 at level 2: section_header: A new ... ical nature
+      item-125 at level 3: paragraph: Monda ... 5 06:25 GMT
+      item-126 at level 3: picture
+        item-126 at level 4: caption: Something is happening inside the Earth, scientists say
+      item-127 at level 3: section_header: Your  ... l the story
+        item-128 at level 4: paragraph: From  ...  messaging.
+        item-129 at level 4: paragraph: At su ...  the story.
+        item-130 at level 4: paragraph: The I ...  afford it.
+        item-131 at level 4: paragraph: The c ... rs believe.
+        item-132 at level 4: paragraph: A new ... cal nature.
+        item-133 at level 4: paragraph: The c ... rs believe.
+        item-134 at level 4: paragraph: While ... h our feet.
+        item-135 at level 4: picture
+          item-135 at level 5: caption: (Getty Images)
+        item-136 at level 4: paragraph: The i ... outer core.
+        item-137 at level 4: paragraph: Resea ... we thought.
+        item-138 at level 4: paragraph: That  ... as thought.
+        item-139 at level 4: paragraph: In fa ... outer core.
+        item-140 at level 4: paragraph: Resea ... inner core.
+        item-141 at level 4: paragraph: “The  ...  the study.
+        item-142 at level 4: paragraph: “What ... nner core.”
+        item-143 at level 4: paragraph: The w ... Geoscience.
+      item-144 at level 3: section_header: More about
+    item-145 at level 2: section_header: Join  ... nting forum
+      item-146 at level 3: paragraph: Join  ... eir replies
+      item-147 at level 3: section_header: Most Popular
+        item-148 at level 4: picture
+        item-149 at level 4: picture
+        item-150 at level 4: picture
+        item-151 at level 4: picture
+        item-152 at level 4: picture
+      item-153 at level 3: section_header: Popular videos
+        item-154 at level 4: picture
+        item-155 at level 4: picture
+        item-156 at level 4: picture
+      item-157 at level 3: section_header: 
+        item-158 at level 4: picture
+        item-159 at level 4: picture
+        item-160 at level 4: picture
+        item-161 at level 4: picture
+        item-162 at level 4: picture
+      item-163 at level 3: section_header: Sponsored Features
+        item-164 at level 4: picture
+        item-165 at level 4: picture
+        item-166 at level 4: picture
+        item-167 at level 4: picture
+        item-168 at level 4: picture
+        item-169 at level 4: list: group list
+          item-170 at level 5: list_item: Get in touch
+            item-171 at level 6: list: group list
+              item-172 at level 7: list_item: Contact us
+            item-173 at level 6: list: group list
+          item-174 at level 5: list_item: Our Products
+            item-175 at level 6: list: group list
+              item-176 at level 7: list_item: Register
+              item-177 at level 7: list_item: Newsletters
+              item-178 at level 7: list_item: Donate
+              item-179 at level 7: list_item: Today’s Edition
+              item-180 at level 7: list_item: Install our app
+              item-181 at level 7: list_item: Archive
+          item-182 at level 5: list_item: Other publications
+            item-183 at level 6: list: group list
+              item-184 at level 7: list_item: Inter ... al editions
+              item-185 at level 7: list_item: Indep ...  en Español
+              item-186 at level 7: list_item: Independent Arabia
+              item-187 at level 7: list_item: Independent Turkish
+              item-188 at level 7: list_item: Independent Persian
+              item-189 at level 7: list_item: Independent Urdu
+              item-190 at level 7: list_item: The Standard
+          item-191 at level 5: list_item: Extras
+            item-192 at level 6: list: group list
+              item-193 at level 7: list_item: Puzzles
+              item-194 at level 7: list_item: All topics
+              item-195 at level 7: list_item: Betting Offers
+              item-196 at level 7: list_item: Voucher codes
+              item-197 at level 7: list_item: Compe ...  and offers
+              item-198 at level 7: list_item: Indep ... Advertising
+              item-199 at level 7: list_item: Independent Ignite
+              item-200 at level 7: list_item: Syndication
+              item-201 at level 7: list_item: Worki ... Independent
+          item-202 at level 5: list_item: Legal
+            item-203 at level 6: list: group list
+              item-204 at level 7: list_item: Code  ...  complaints
+              item-205 at level 7: list_item: Contributors
+              item-206 at level 7: list_item: Cookie policy
+              item-207 at level 7: list_item: Donat ...  Conditions
+              item-208 at level 7: list_item: Privacy policy
+              item-209 at level 7: list_item: User policies
+              item-210 at level 7: list_item: Moder ... y Statement
+      item-211 at level 3: section_header: Thank ... registering
+        item-212 at level 4: paragraph: Pleas ... e logged in
+        item-213 at level 4: picture
+  item-214 at level 1: caption: Somet ... entists say
+  item-215 at level 1: caption: (Getty Images)
+INFO:autogen.agents.experimental.document_agent.docling_query_engine:Loading input doc: /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/earth-core-inner-shape-change-b2695585.md
+INFO:autogen.agents.experimental.document_agent.docling_doc_ingest_agent:data_ingest_task context_variables:
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_myCghcBFOGBtGiEdW603eqjN) *****
+Data Ingestion Task Completed for https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_TNqm8tpeJPWCVLlWPN43ajN2): transfer_TaskManagerAgent_to_QueryAgent *****
+Arguments: 
+{}
+********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_QueryAgent...
+Call ID: call_TNqm8tpeJPWCVLlWPN43ajN2
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_TNqm8tpeJPWCVLlWPN43ajN2) *****
+Swarm agent --> QueryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_qFXKC0ZuP85Lr5o7mA068ZNT): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_qFXKC0ZuP85Lr5o7mA068ZNT
+Input arguments: {'context_variables': {'CompletedTaskCount': 1, 'DocumentsToIngest': [], 'DocumentsIngested': ['https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': "Summarize the article about changes in Earth's core from the provided URL."}], 'QueryResults': [], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_qFXKC0ZuP85Lr5o7mA068ZNT) *****
+Scientists have discovered unexpected changes in the Earth's inner core, which is altering its physical nature. This new study suggests that the core is not as solid as previously thought and may undergo a process called "viscous deformation," where its shape changes and interacts with the outer core. The research, which analyzed seismographs from numerous decades, found evidence of this activity through distinct seismic waves from earthquakes near Antarctica's South Sandwich Islands. These findings indicate that the turbulent outer core might be affecting the inner core on a human timescale, potentially altering the length of each day. The study is detailed in a paper published in Nature Geoscience.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+The article discusses a study revealing unexpected changes in Earth's inner core, which appears less solid than previously believed. The core undergoes "viscous deformation," altering shape due to interaction with the turbulent outer core. This interaction may affect Earth's rotational dynamics, altering the length of a day. The findings, based on seismic data from decades of earthquake monitoring, are published in Nature Geoscience.
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_2QjohC64x1PYMKjvvD6uXxW6): transfer_TaskManagerAgent_to_SummaryAgent *****
+Arguments: 
+{}
+**********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_SummaryAgent...
+Call ID: call_2QjohC64x1PYMKjvvD6uXxW6
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_2QjohC64x1PYMKjvvD6uXxW6) *****
+Swarm agent --> SummaryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: SummaryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+SummaryAgent (to chat_manager):
+
+Summary of Completed Task: 
+Scientists have discovered unexpected changes in the Earth's inner core, altering its physical nature. The core is not as solid as thought and may undergo "viscous deformation," where its shape changes and interacts with the outer core. The research found evidence from seismic waves of earthquakes near Antarctica's South Sandwich Islands. These findings indicate that the turbulent outer core might be affecting the inner core on a human timescale, potentially altering the length of each day. The study is detailed in a paper published in Nature Geoscience.
+
+Query and Answers: 
+Query: Summarize the article about changes in Earth's core from the provided URL.
+Answer: Scientists have discovered unexpected changes in the Earth's inner core, which is altering its physical nature. This new study suggests that the core is not as solid as previously thought and may undergo a process called "viscous deformation," where its shape changes and interacts with the outer core. The research, which analyzed seismographs from numerous decades, found evidence of this activity through distinct seismic waves from earthquakes near Antarctica's South Sandwich Islands. These findings indicate that the turbulent outer core might be affecting the inner core on a human timescale, potentially altering the length of each day. The study is detailed in a paper published in Nature Geoscience.
+
+--------------------------------------------------------------------------------
+DocAgent (to user):
+
+Summary of Completed Task: 
+Scientists have discovered unexpected changes in the Earth's inner core, altering its physical nature. The core is not as solid as thought and may undergo "viscous deformation," where its shape changes and interacts with the outer core. The research found evidence from seismic waves of earthquakes near Antarctica's South Sandwich Islands. These findings indicate that the turbulent outer core might be affecting the inner core on a human timescale, potentially altering the length of each day. The study is detailed in a paper published in Nature Geoscience.
+
+Query and Answers: 
+Query: Summarize the article about changes in Earth's core from the provided URL.
+Answer: Scientists have discovered unexpected changes in the Earth's inner core, which is altering its physical nature. This new study suggests that the core is not as solid as previously thought and may undergo a process called "viscous deformation," where its shape changes and interacts with the outer core. The research, which analyzed seismographs from numerous decades, found evidence of this activity through distinct seismic waves from earthquakes near Antarctica's South Sandwich Islands. These findings indicate that the turbulent outer core might be affecting the inner core on a human timescale, potentially altering the length of each day. The study is detailed in a paper published in Nature Geoscience.
+
+--------------------------------------------------------------------------------
+```
+
+``` text
+ChatResult(chat_id=None, chat_history=[{'content': "could you read 'https://www.independent.co.uk/space/earth-core-inner-shape-change-b2695585.html' and summarize the article?", 'role': 'assistant', 'name': 'user'}, {'content': 'Summary of Completed Task: \nScientists have discovered unexpected changes in the Earth\'s inner core, altering its physical nature. The core is not as solid as thought and may undergo "viscous deformation," where its shape changes and interacts with the outer core. The research found evidence from seismic waves of earthquakes near Antarctica\'s South Sandwich Islands. These findings indicate that the turbulent outer core might be affecting the inner core on a human timescale, potentially altering the length of each day. The study is detailed in a paper published in Nature Geoscience.\n\nQuery and Answers: \nQuery: Summarize the article about changes in Earth\'s core from the provided URL.\nAnswer: Scientists have discovered unexpected changes in the Earth\'s inner core, which is altering its physical nature. This new study suggests that the core is not as solid as previously thought and may undergo a process called "viscous deformation," where its shape changes and interacts with the outer core. The research, which analyzed seismographs from numerous decades, found evidence of this activity through distinct seismic waves from earthquakes near Antarctica\'s South Sandwich Islands. These findings indicate that the turbulent outer core might be affecting the inner core on a human timescale, potentially altering the length of each day. The study is detailed in a paper published in Nature Geoscience.', 'role': 'user', 'name': 'DocAgent'}], summary='Summary of Completed Task: \nScientists have discovered unexpected changes in the Earth\'s inner core, altering its physical nature. The core is not as solid as thought and may undergo "viscous deformation," where its shape changes and interacts with the outer core. The research found evidence from seismic waves of earthquakes near Antarctica\'s South Sandwich Islands. These findings indicate that the turbulent outer core might be affecting the inner core on a human timescale, potentially altering the length of each day. The study is detailed in a paper published in Nature Geoscience.\n\nQuery and Answers: \nQuery: Summarize the article about changes in Earth\'s core from the provided URL.\nAnswer: Scientists have discovered unexpected changes in the Earth\'s inner core, which is altering its physical nature. This new study suggests that the core is not as solid as previously thought and may undergo a process called "viscous deformation," where its shape changes and interacts with the outer core. The research, which analyzed seismographs from numerous decades, found evidence of this activity through distinct seismic waves from earthquakes near Antarctica\'s South Sandwich Islands. These findings indicate that the turbulent outer core might be affecting the inner core on a human timescale, potentially altering the length of each day. The study is detailed in a paper published in Nature Geoscience.', cost={'usage_including_cached_inference': {'total_cost': 0}, 'usage_excluding_cached_inference': {'total_cost': 0}}, human_input=[])
+```
+
+## Multiple DocAgents in a Swarm
+
+Now we’re going to use multiple DocAgents, each responsible for their
+own data.
+
+An nvidia_agent agent will ingest NVIDIA’s financial report and query
+it. Similarly, an amd_agent will do the same with AMD’s financial
+report.
+
+Although a single agent could ingest and query the documents, we want to
+ensure that their queries aren’t tainted by the other company’s
+documents. So we keep them separate and give them a unique
+`collection_name` which, in turn, will create individual data stores
+(See more on [Chroma
+collections](https://cookbook.chromadb.dev/core/collections/)).
+
+```python
+# Ensure the OPENAI_API_KEY is set in the environment
+llm_config = {"model": model_id, "api_type": "openai", "cache_seed": None}
+
+# Create agents for the NVIDIA and AMD documents
+# Each agent has a unique collection_name so that data and queries are run in different vector store spaces
+nvidia_agent = DocAgent(
+    name="nvidia_agent",
+    llm_config=llm_config,
+    collection_name="nvidia-demo",
+)
+
+amd_agent = DocAgent(
+    name="amd_agent",
+    llm_config=llm_config,
+    collection_name="amd-demo",
+)
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.docling_query_engine:Using existing collection nvidia-demo from the database.
+INFO:autogen.agents.experimental.document_agent.docling_query_engine:Using existing collection amd-demo from the database.
+```
+
+```python
+# A financial analyst agent who will direct the DocAgents to ingest documents and answer questions
+# The financial analyst will also summarize the results and terminate the conversation
+analyst = ConversableAgent(
+    name="financial_analyst",
+    system_message=(
+        "You are a financial analyst working with two specialist agents, amd_agent who handles all AMD documents and queries, "
+        " and nvidia_agent who handles all NVIDIA documents and queries. "
+        "Each agent knows how to load documents and answer questions from the document regarding their respective companies. "
+        "Only mention one of the two agents at a time, prioritize amd_agent. You will be able to engage each agent separately"
+        " in subsequent iterations. "
+        "CRITICAL - Work with ONLY ONE agent at a time and provide (a) an indication for them to take action "
+        " by saying '[Next to speak is ...]' together with (b) documents they need to ingest and (c) queries they need to run, if any. "
+        "DO NOT provide instructions that include the mention of both agents in the one response. "
+        "When all documents have been ingested and all queries have been answered, provide a summary "
+        " and add 'TERMINATE' to the end of your summary. "
+        "The summary should contain detailed bullet points (multiple per query if needed) and grouped by each query. "
+        " After the summary provide a one line conclusion. "
+        " Add the term '(This is not financial advice)' at the end of your conclusion. "
+        "If there are errors, list them and say 'TERMINATE'. "
+        "If there are no errors, do not say 'TERMINATE' until each agent has run their queries and provided their answers."
+    ),
+    is_termination_msg=lambda x: x.get("content", "") and "terminate" in x.get("content", "").lower(),
+    llm_config=llm_config,
+)
+```
+
+
+```python
+# Initiate the swarm (change the file paths in the messages if needed)
+result, _, _ = initiate_swarm_chat(
+    initial_agent=analyst,
+    agents=[analyst, nvidia_agent, amd_agent],
+    messages=(
+        "Use the amd_agent to load AMD's 4th quarter 2024 report from "
+        "./docagent/AMDQ4-2024.pdf "
+        "and use the nvidia_agent to load NVIDIA's 3rd quarter 2025 report from "
+        "./docagent/NVIDIAQ3-2025.pdf. "
+        "Ask 'amd_agent' to ingest the AMD document and answer two queries "
+        "(a) what AMD did in regards to AI and (b) what was the Q4 2024 GAAP revenue."
+        "Ask 'nvidia_agent' to ingest the NVIDIA document and answer two queries "
+        "(a) what NVIDIA did in regards to AI and (b) what was Q3 2025 GAAP revenue."
+    ),
+    swarm_manager_args={
+        "llm_config": llm_config,
+        "system_message": "You are managing a financial analyst and two specialist company agents. After amd_agent or nvidia_agent, select the financial_analyst to speak next.",
+        "is_termination_msg": lambda x: x.get("content", "") and "terminate" in x.get("content", "").lower(),
+    },
+    after_work=AfterWorkOption.SWARM_MANAGER,
+)
+```
+
+``` text
+_User (to chat_manager):
+
+Use the amd_agent to load AMD's 4th quarter 2024 report from ./docagent/AMDQ4-2024.pdf and use the nvidia_agent to load NVIDIA's 3rd quarter 2025 report from ./docagent/NVIDIAQ3-2025.pdf. Ask 'amd_agent' to ingest the AMD document and answer two queries (a) what AMD did in regards to AI and (b) what was the Q4 2024 GAAP revenue.Ask 'nvidia_agent' to ingest the NVIDIA document and answer two queries (a) what NVIDIA did in regards to AI and (b) what was Q3 2025 GAAP revenue.
+
+--------------------------------------------------------------------------------
+
+Next speaker: financial_analyst
+
+
+>>>>>>>> USING AUTO REPLY...
+financial_analyst (to chat_manager):
+
+[Next to speak is amd_agent]  
+Documents to ingest:  
+- ./docagent/AMDQ4-2024.pdf  
+
+Queries to run:  
+1. What did AMD do in regards to AI?  
+2. What was the Q4 2024 GAAP revenue?
+
+--------------------------------------------------------------------------------
+
+Next speaker: amd_agent
+
+_User (to chat_manager):
+
+[Next to speak is amd_agent]  
+Documents to ingest:  
+- ./docagent/AMDQ4-2024.pdf  
+
+Queries to run:  
+1. What did AMD do in regards to AI?  
+2. What was the Q4 2024 GAAP revenue?
+
+--------------------------------------------------------------------------------
+
+Next speaker: DocumentTriageAgent
+
+DocumentTriageAgent (to chat_manager):
+
+{"ingestions":[{"path_or_url":"./docagent/AMDQ4-2024.pdf"}],"queries":[{"query_type":"RAG_QUERY","query":"What did AMD do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was the Q4 2024 GAAP revenue?"}]}
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_XlpmpnOv6PTF86SSL5It5fwd): initiate_tasks *****
+Arguments: 
+{"ingestions":[{"path_or_url":"./docagent/AMDQ4-2024.pdf"}],"queries":[{"query_type":"RAG_QUERY","query":"What did AMD do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was the Q4 2024 GAAP revenue?"}]}
+*******************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION initiate_tasks...
+Call ID: call_XlpmpnOv6PTF86SSL5It5fwd
+Input arguments: {'ingestions': [{'path_or_url': './docagent/AMDQ4-2024.pdf'}], 'queries': [{'query_type': 'RAG_QUERY', 'query': 'What did AMD do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}], 'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [], 'DocumentsIngested': [], 'QueriesToRun': [], 'QueryResults': []}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_agent:initiate_tasks context_variables
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_XlpmpnOv6PTF86SSL5It5fwd) *****
+Updated context variables with task decisions
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_azQmbpAcbINEgz6gU8I4aiKR): transfer_TaskManagerAgent_to_DoclingDocIngestAgent *****
+Arguments: 
+{}
+*******************************************************************************************************************
+***** Suggested tool call (call_WO099il2sq45HxcMsFCZ3bxN): transfer_TaskManagerAgent_to_DoclingDocIngestAgent *****
+Arguments: 
+{}
+*******************************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_DoclingDocIngestAgent...
+Call ID: call_azQmbpAcbINEgz6gU8I4aiKR
+Input arguments: {}
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_DoclingDocIngestAgent...
+Call ID: call_WO099il2sq45HxcMsFCZ3bxN
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_azQmbpAcbINEgz6gU8I4aiKR) *****
+Swarm agent --> DoclingDocIngestAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+***** Response from calling tool (call_WO099il2sq45HxcMsFCZ3bxN) *****
+Swarm agent --> DoclingDocIngestAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: DoclingDocIngestAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+DoclingDocIngestAgent (to chat_manager):
+
+***** Suggested tool call (call_pVgBu44fhYjf1mjZv6N4rJFK): data_ingest_task *****
+Arguments: 
+{}
+*********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION data_ingest_task...
+Call ID: call_pVgBu44fhYjf1mjZv6N4rJFK
+Input arguments: {'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [{'path_or_url': './docagent/AMDQ4-2024.pdf'}], 'DocumentsIngested': [], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What did AMD do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}], 'QueryResults': [], 'TaskInitiated': True}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_utils:Error when checking if ./docagent/AMDQ4-2024.pdf is a valid URL: Invalid URL.
+INFO:autogen.agents.experimental.document_agent.document_utils:Detected file. Returning file path...
+INFO:docling.document_converter:Going to convert document batch...
+/home/papagame/anaconda3/envs/ag2/lib/python3.11/site-packages/docling/models/easyocr_model.py:63: UserWarning: Deprecated field. Better to set the `accelerator_options.device` in `pipeline_options`. When `use_gpu and accelerator_options.device == AcceleratorDevice.CUDA` the GPU is used to run EasyOCR. Otherwise, EasyOCR runs in CPU.
+  warnings.warn(
+/home/papagame/anaconda3/envs/ag2/lib/python3.11/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: CUDA unknown error - this may be due to an incorrectly set up environment, e.g. changing env variable CUDA_VISIBLE_DEVICES after program start. Setting the available devices to be zero. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
+  return torch._C._cuda_getDeviceCount() > 0
+INFO:docling.utils.accelerator_utils:Accelerator device: 'cpu'
+INFO:docling.utils.accelerator_utils:Accelerator device: 'cpu'
+INFO:docling.pipeline.base_pipeline:Processing document AMDQ4-2024.pdf
+INFO:docling.document_converter:Finished converting document AMDQ4-2024.pdf in 30.28 sec.
+INFO:autogen.agents.experimental.document_agent.parser_utils:Document converted in 30.28 seconds.
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Document AMDQ4-2024.pdf converted.
+Saved markdown output to: /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:item-0 at level 0: unspecified: group _root_
+  item-1 at level 1: section_header: NEWS RELEASE
+  item-2 at level 1: picture
+  item-3 at level 1: text: Media ... rie@amd.com
+  item-4 at level 1: text: Inves ... say@amd.com
+  item-5 at level 1: section_header: AMD R ... ial Results
+  item-6 at level 1: text: SANTA ...  was $1.09.
+  item-7 at level 1: text: For t ...  was $3.31.
+  item-8 at level 1: text: '2024 ... computing.'
+  item-9 at level 1: text: 'We c ... er Jean Hu.
+  item-10 at level 1: picture
+  item-11 at level 1: section_header: GAAP  ... ial Results
+  item-12 at level 1: table with [9x6]
+  item-13 at level 1: section_header: Non-G ... ial Results
+  item-14 at level 1: table with [9x6]
+  item-15 at level 1: section_header: Annua ... ial Results
+  item-16 at level 1: table with [10x7]
+  item-17 at level 1: section_header: Segment Summary
+  item-18 at level 1: list: group list
+    item-19 at level 2: list_item: · Dat ...  CPU sales.
+    item-20 at level 2: list_item: o For ... processors.
+  item-21 at level 1: picture
+  item-22 at level 1: list: group list
+    item-23 at level 2: list_item: · Cli ... processors.
+    item-24 at level 2: list_item: o For ... and mobile.
+    item-25 at level 2: list_item: · Gam ... om revenue.
+    item-26 at level 2: list_item: o For ... om revenue.
+    item-27 at level 2: list_item: · Emb ... o be mixed.
+    item-28 at level 2: list_item: o For ... ory levels.
+  item-29 at level 1: section_header: Recent PR Highlights
+  item-30 at level 1: list: group list
+    item-31 at level 2: list_item: · AMD ... e at scale:
+    item-32 at level 2: list_item: o IBM ...  IBM Cloud.
+    item-33 at level 2: list_item: o Vul ... deployment.
+    item-34 at level 2: list_item: o Ale ... nterprises.
+    item-35 at level 2: list_item: o Fuj ...  source AI.
+    item-36 at level 2: list_item: o AMD ...  and Absci.
+  item-37 at level 1: picture
+  item-38 at level 1: list: group list
+    item-39 at level 2: list_item: · AMD ...  ecosystem:
+    item-40 at level 2: list_item: o AMD ...  libraries.
+    item-41 at level 2: list_item: o AMD ... plications.
+    item-42 at level 2: list_item: · Del ... laboration.
+    item-43 at level 2: list_item: · AMD ...  portfolio:
+    item-44 at level 2: list_item: o New ...  workloads.
+    item-45 at level 2: list_item: o Exp ... ness users.
+    item-46 at level 2: list_item: o Add ... fessionals.
+    item-47 at level 2: list_item: o Mor ...  this year.
+    item-48 at level 2: list_item: · AMD ...  the world:
+    item-49 at level 2: list_item: o The ... op500 list.
+    item-50 at level 2: list_item: o The ... lic sector.
+  item-51 at level 1: picture
+  item-52 at level 1: list: group list
+    item-53 at level 2: list_item: o AMD ...  in Norway.
+    item-54 at level 2: list_item: · AMD ... of devices:
+    item-55 at level 2: list_item: o At  ... eld gaming.
+    item-56 at level 2: list_item: o AMD ... MD HYPR-RX.
+    item-57 at level 2: list_item: · AMD ...  solutions:
+    item-58 at level 2: list_item: o New ... se markets.
+    item-59 at level 2: list_item: o AMD ... ingle chip.
+    item-60 at level 2: list_item: o Vod ... l services.
+  item-61 at level 1: section_header: Current Outlook
+  item-62 at level 1: text: AMD's ... ent' below.
+  item-63 at level 1: text: For t ... mately 54%.
+  item-64 at level 1: picture
+  item-65 at level 1: section_header: AMD Teleconference
+  item-66 at level 1: text: AMD w ... ww.amd.com.
+  item-67 at level 1: section_header: RECON ... AL MEASURES
+  item-68 at level 1: text: (in m ... (Unaudited)
+  item-69 at level 1: table with [27x6]
+  item-70 at level 1: table with [12x11]
+  item-71 at level 1: picture
+  item-72 at level 1: picture
+  item-73 at level 1: list: group list
+    item-74 at level 2: list_item: (1) A ... ng charges.
+    item-75 at level 2: list_item: (2) I ... g facility.
+    item-76 at level 2: list_item: (3) R ... mpairments.
+  item-77 at level 1: section_header: About AMD
+  item-78 at level 1: text: For m ... nd X pages.
+  item-79 at level 1: section_header: Cautionary Statement
+  item-80 at level 1: text: This  ...  purchases;
+  item-81 at level 1: text: AMD's ... K and 10-Q.
+  item-82 at level 1: picture
+  item-83 at level 1: list: group list
+    item-84 at level 2: list_item: (*) I ... red by law.
+  item-85 at level 1: text: -30-
+  item-86 at level 1: text: ©2025 ... vices, Inc.
+  item-87 at level 1: section_header: [AMD  ...  Financial]
+  item-88 at level 1: section_header: ADVAN ... VICES, INC.
+  item-89 at level 1: section_header: CONDE ...  OPERATIONS
+  item-90 at level 1: text: (Mill ... (Unaudited)
+  item-91 at level 1: table with [26x6]
+  item-92 at level 1: section_header: [AMD  ...  Financial]
+  item-93 at level 1: section_header: ADVAN ... VICES, INC.
+  item-94 at level 1: section_header: CONDE ... ANCE SHEETS
+  item-95 at level 1: text: (Millions)
+  item-96 at level 1: table with [40x3]
+  item-97 at level 1: section_header: [AMD  ...  Financial]
+  item-98 at level 1: section_header: ADVAN ... VICES, INC.
+  item-99 at level 1: section_header: CONDE ...  CASH FLOWS
+  item-100 at level 1: section_header: (Mill ... (Unaudited)
+  item-101 at level 1: table with [41x5]
+  item-102 at level 1: section_header: [AMD  ...  Financial]
+  item-103 at level 1: section_header: ADVAN ... VICES, INC.
+  item-104 at level 1: section_header: SELEC ... PORATE DATA
+  item-105 at level 1: text: (Mill ... (Unaudited)
+  item-106 at level 1: table with [28x6]
+  item-107 at level 1: section_header: [AMD  ...  Financial]
+  item-108 at level 1: list: group list
+    item-109 at level 2: list_item: (1) T ... ta centers.
+    item-110 at level 2: list_item: The C ...  notebooks.
+    item-111 at level 2: list_item: The G ... t services.
+    item-112 at level 2: list_item: The E ... C products.
+    item-113 at level 2: list_item: From  ...  portfolio.
+    item-114 at level 2: list_item: All O ... nsing gain.
+  item-115 at level 1: section_header: (2) R ... sted EBITDA
+  item-116 at level 1: table with [14x6]
+  item-117 at level 1: text: The C ... cash flows.
+  item-118 at level 1: section_header: (3) R ... e Cash Flow
+  item-119 at level 1: table with [7x6]
+  item-120 at level 1: text: The C ... activities.
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-1.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-2.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-3.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-4.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-5.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-6.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-7.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-8.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-9.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-10.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024-table-11.html
+INFO:autogen.agents.experimental.document_agent.docling_query_engine:Loading input doc: /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/AMDQ4-2024.md
+INFO:autogen.agents.experimental.document_agent.docling_doc_ingest_agent:data_ingest_task context_variables:
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_pVgBu44fhYjf1mjZv6N4rJFK) *****
+Data Ingestion Task Completed for ./docagent/AMDQ4-2024.pdf
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_f4GnPgVWyZnS3fjIgGLZzmf9): transfer_TaskManagerAgent_to_QueryAgent *****
+Arguments: 
+{}
+********************************************************************************************************
+***** Suggested tool call (call_cyAbhnWlljo1Oa3Z8agS08wO): transfer_TaskManagerAgent_to_QueryAgent *****
+Arguments: 
+{}
+********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_QueryAgent...
+Call ID: call_f4GnPgVWyZnS3fjIgGLZzmf9
+Input arguments: {}
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_QueryAgent...
+Call ID: call_cyAbhnWlljo1Oa3Z8agS08wO
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_f4GnPgVWyZnS3fjIgGLZzmf9) *****
+Swarm agent --> QueryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+***** Response from calling tool (call_cyAbhnWlljo1Oa3Z8agS08wO) *****
+Swarm agent --> QueryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_p5n8lFvJkLqp939vZx59WMt1): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_p5n8lFvJkLqp939vZx59WMt1
+Input arguments: {'context_variables': {'CompletedTaskCount': 1, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/AMDQ4-2024.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What did AMD do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}], 'QueryResults': [], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_p5n8lFvJkLqp939vZx59WMt1) *****
+AMD expanded its partnerships to enhance AI infrastructure, including collaborations with IBM, Vultr, Aleph Alpha, and Fujitsu. They released ROCm 6.3 with performance enhancements for AMD Instinct accelerators and shared plans for the ROCm software stack to improve AI application support. AMD also introduced new processors, such as the Ryzen AI PRO, to power AI capabilities in Dell PCs and expanded their AI PC portfolio with new Ryzen AI Max and Ryzen AI Max PRO Series processors. Additionally, AMD made strategic investments to advance the AI ecosystem and solutions.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_SdBlUyzTmKewrlLVIo5is8FV): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_SdBlUyzTmKewrlLVIo5is8FV
+Input arguments: {'context_variables': {'CompletedTaskCount': 2, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/AMDQ4-2024.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}], 'QueryResults': [{'query': 'What did AMD do in regards to AI?', 'answer': 'AMD expanded its partnerships to enhance AI infrastructure, including collaborations with IBM, Vultr, Aleph Alpha, and Fujitsu. They released ROCm 6.3 with performance enhancements for AMD Instinct accelerators and shared plans for the ROCm software stack to improve AI application support. AMD also introduced new processors, such as the Ryzen AI PRO, to power AI capabilities in Dell PCs and expanded their AI PC portfolio with new Ryzen AI Max and Ryzen AI Max PRO Series processors. Additionally, AMD made strategic investments to advance the AI ecosystem and solutions.'}], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_SdBlUyzTmKewrlLVIo5is8FV) *****
+The Q4 2024 GAAP revenue was $7.7 billion.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+1. AMD expanded its partnerships to enhance AI infrastructure, including collaborations with IBM, Vultr, Aleph Alpha, and Fujitsu. They released ROCm 6.3 with performance enhancements for AMD Instinct accelerators and shared plans for the ROCm software stack to improve AI application support. AMD also introduced new processors, such as the Ryzen AI PRO, to power AI capabilities in Dell PCs and expanded their AI PC portfolio with new Ryzen AI Max and Ryzen AI Max PRO Series processors. Additionally, AMD made strategic investments to advance the AI ecosystem and solutions.
+
+2. The Q4 2024 GAAP revenue was $7.7 billion.
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_Mi7nAUefmZTPKM1r78SqhrhP): transfer_TaskManagerAgent_to_SummaryAgent *****
+Arguments: 
+{}
+**********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_SummaryAgent...
+Call ID: call_Mi7nAUefmZTPKM1r78SqhrhP
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_Mi7nAUefmZTPKM1r78SqhrhP) *****
+Swarm agent --> SummaryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: SummaryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+SummaryAgent (to chat_manager):
+
+**Summary of Completed Tasks:**
+- Document ingested: `./docagent/AMDQ4-2024.pdf`
+- Queries executed successfully.
+
+**Query and Answers:**
+1. **Query:** What did AMD do in regards to AI?  
+   **Answer:** AMD expanded its partnerships to enhance AI infrastructure, including collaborations with IBM, Vultr, Aleph Alpha, and Fujitsu. They released ROCm 6.3 with performance enhancements for AMD Instinct accelerators and shared plans for the ROCm software stack to improve AI application support. AMD also introduced new processors, such as the Ryzen AI PRO, to power AI capabilities in Dell PCs and expanded their AI PC portfolio with new Ryzen AI Max and Ryzen AI Max PRO Series processors. Additionally, AMD made strategic investments to advance the AI ecosystem and solutions.
+
+2. **Query:** What was the Q4 2024 GAAP revenue?  
+   **Answer:** The Q4 2024 GAAP revenue was $7.7 billion.
+
+--------------------------------------------------------------------------------
+amd_agent (to chat_manager):
+
+**Summary of Completed Tasks:**
+- Document ingested: `./docagent/AMDQ4-2024.pdf`
+- Queries executed successfully.
+
+**Query and Answers:**
+1. **Query:** What did AMD do in regards to AI?  
+   **Answer:** AMD expanded its partnerships to enhance AI infrastructure, including collaborations with IBM, Vultr, Aleph Alpha, and Fujitsu. They released ROCm 6.3 with performance enhancements for AMD Instinct accelerators and shared plans for the ROCm software stack to improve AI application support. AMD also introduced new processors, such as the Ryzen AI PRO, to power AI capabilities in Dell PCs and expanded their AI PC portfolio with new Ryzen AI Max and Ryzen AI Max PRO Series processors. Additionally, AMD made strategic investments to advance the AI ecosystem and solutions.
+
+2. **Query:** What was the Q4 2024 GAAP revenue?  
+   **Answer:** The Q4 2024 GAAP revenue was $7.7 billion.
+
+--------------------------------------------------------------------------------
+
+Next speaker: financial_analyst
+
+
+>>>>>>>> USING AUTO REPLY...
+financial_analyst (to chat_manager):
+
+[Next to speak is nvidia_agent]  
+Documents to ingest:  
+- ./docagent/NVIDIAQ3-2025.pdf  
+
+Queries to run:  
+1. What did NVIDIA do in regards to AI?  
+2. What was Q3 2025 GAAP revenue?
+
+--------------------------------------------------------------------------------
+
+Next speaker: nvidia_agent
+
+_User (to chat_manager):
+
+[Next to speak is nvidia_agent]  
+Documents to ingest:  
+- ./docagent/NVIDIAQ3-2025.pdf  
+
+Queries to run:  
+1. What did NVIDIA do in regards to AI?  
+2. What was Q3 2025 GAAP revenue?
+
+--------------------------------------------------------------------------------
+
+Next speaker: DocumentTriageAgent
+
+DocumentTriageAgent (to chat_manager):
+
+{"ingestions":[{"path_or_url":"./docagent/NVIDIAQ3-2025.pdf"}],"queries":[{"query_type":"RAG_QUERY","query":"What did NVIDIA do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was Q3 2025 GAAP revenue?"}]}
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_XD8tC1jmHSWHrL84GbXJhBkG): initiate_tasks *****
+Arguments: 
+{"ingestions":[{"path_or_url":"./docagent/NVIDIAQ3-2025.pdf"}],"queries":[{"query_type":"RAG_QUERY","query":"What did NVIDIA do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was Q3 2025 GAAP revenue?"}]}
+*******************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION initiate_tasks...
+Call ID: call_XD8tC1jmHSWHrL84GbXJhBkG
+Input arguments: {'ingestions': [{'path_or_url': './docagent/NVIDIAQ3-2025.pdf'}], 'queries': [{'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [], 'DocumentsIngested': [], 'QueriesToRun': [], 'QueryResults': []}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_agent:initiate_tasks context_variables
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_XD8tC1jmHSWHrL84GbXJhBkG) *****
+Updated context variables with task decisions
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_toRoUAowTwIwc0e7vDDyD3qN): transfer_TaskManagerAgent_to_DoclingDocIngestAgent *****
+Arguments: 
+{}
+*******************************************************************************************************************
+***** Suggested tool call (call_u6f5nFxqRX2X3HB4AZJZSfnR): transfer_TaskManagerAgent_to_QueriesAgent *****
+Arguments: 
+{}
+**********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_DoclingDocIngestAgent...
+Call ID: call_toRoUAowTwIwc0e7vDDyD3qN
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_toRoUAowTwIwc0e7vDDyD3qN) *****
+Swarm agent --> DoclingDocIngestAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+***** Response from calling tool (call_u6f5nFxqRX2X3HB4AZJZSfnR) *****
+Error: Function transfer_TaskManagerAgent_to_QueriesAgent not found.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: DoclingDocIngestAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+DoclingDocIngestAgent (to chat_manager):
+
+***** Suggested tool call (call_m109pZO6q5bINR9GqPRnyC3r): data_ingest_task *****
+Arguments: 
+{}
+*********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION data_ingest_task...
+Call ID: call_m109pZO6q5bINR9GqPRnyC3r
+Input arguments: {'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [{'path_or_url': './docagent/NVIDIAQ3-2025.pdf'}], 'DocumentsIngested': [], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [], 'TaskInitiated': True}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_utils:Error when checking if ./docagent/NVIDIAQ3-2025.pdf is a valid URL: Invalid URL.
+INFO:autogen.agents.experimental.document_agent.document_utils:Detected file. Returning file path...
+INFO:docling.document_converter:Going to convert document batch...
+INFO:docling.utils.accelerator_utils:Accelerator device: 'cpu'
+INFO:docling.utils.accelerator_utils:Accelerator device: 'cpu'
+INFO:docling.pipeline.base_pipeline:Processing document NVIDIAQ3-2025.pdf
+INFO:docling.document_converter:Finished converting document NVIDIAQ3-2025.pdf in 21.97 sec.
+INFO:autogen.agents.experimental.document_agent.parser_utils:Document converted in 21.97 seconds.
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Document NVIDIAQ3-2025.pdf converted.
+Saved markdown output to: /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:item-0 at level 0: unspecified: group _root_
+  item-1 at level 1: picture
+  item-2 at level 1: section_header: NVIDI ... Fiscal 2025
+  item-3 at level 1: list: group list
+    item-4 at level 2: list_item: Recor ...  a year ago
+    item-5 at level 2: list_item: Recor ...  a year ago
+  item-6 at level 1: text: SANTA ... a year ago.
+  item-7 at level 1: text: For t ... a year ago.
+  item-8 at level 1: text: 'The  ...  inference.
+  item-9 at level 1: text: 'AI i ... ,' he said.
+  item-10 at level 1: text: NVIDI ... er 5, 2024.
+  item-11 at level 1: section_header: Q3 Fi ... 025 Summary
+  item-12 at level 1: table with [8x6]
+  item-13 at level 1: table with [8x6]
+  item-14 at level 1: text: *All  ... ne 7, 2024.
+  item-15 at level 1: section_header: Outlook
+  item-16 at level 1: text: NVIDI ... as follows:
+  item-17 at level 1: list: group list
+    item-18 at level 2: list_item: Reven ... r minus 2%.
+    item-19 at level 2: list_item: GAAP  ... sis points.
+    item-20 at level 2: list_item: GAAP  ... spectively.
+    item-21 at level 2: list_item: GAAP  ... 00 million,
+  item-22 at level 1: text: exclu ... securities.
+  item-23 at level 1: list: group list
+    item-24 at level 2: list_item: GAAP  ... rete items.
+  item-25 at level 1: section_header: Highlights
+  item-26 at level 1: text: NVIDI ... hese areas:
+  item-27 at level 1: section_header: Data Center
+  item-28 at level 1: list: group list
+    item-29 at level 2: list_item: Third ... a year ago.
+    item-30 at level 2: list_item: Annou ... oming soon.
+    item-31 at level 2: list_item: Launc ... networking.
+    item-32 at level 2: list_item: Intro ...  of AI-RAN.
+    item-33 at level 2: list_item: Annou ...  AI Aerial.
+    item-34 at level 2: list_item: Revea ... e software.
+    item-35 at level 2: list_item: Accel ... g platform.
+    item-36 at level 2: list_item: Unvei ...  Blackwell.
+    item-37 at level 2: list_item: Annou ... benchmarks.
+    item-38 at level 2: list_item: Contr ...  standards.
+    item-39 at level 2: list_item: Revea ...  worldwide.
+    item-40 at level 2: list_item: Annou ... e software.
+  item-41 at level 1: section_header: Gaming and AI PC
+  item-42 at level 1: list: group list
+    item-43 at level 2: list_item: Third ... a year ago.
+    item-44 at level 2: list_item: Celeb ... ven future.
+    item-45 at level 2: list_item: Demon ... t Gamescom.
+    item-46 at level 2: list_item: Intro ... Veilguard .
+    item-47 at level 2: list_item: Began ... xt quarter.
+  item-48 at level 1: section_header: Profe ... sualization
+  item-49 at level 1: list: group list
+    item-50 at level 2: list_item: Third ... a year ago.
+    item-51 at level 2: list_item: Annou ... Superchips.
+    item-52 at level 2: list_item: Revea ... operations.
+    item-53 at level 2: list_item: Unvei ... n delivery.
+  item-54 at level 1: section_header: Autom ... nd Robotics
+  item-55 at level 1: list: group list
+    item-56 at level 2: list_item: Third ... a year ago.
+    item-57 at level 2: list_item: Revea ...  computing.
+    item-58 at level 2: list_item: Intro ... developers.
+    item-59 at level 2: list_item: Annou ... hysical AI.
+  item-60 at level 1: section_header: CFO Commentary
+  item-61 at level 1: text: Comme ... nvidia.com.
+  item-62 at level 1: section_header: Confe ... Information
+  item-63 at level 1: text: NVIDI ... iscal 2025.
+  item-64 at level 1: section_header: Non-GAAP Measures
+  item-65 at level 1: text: To su ...  companies.
+  item-66 at level 1: section_header: NVIDIA CORPORATION
+  item-67 at level 1: section_header: CONDE ... S OF INCOME
+  item-68 at level 1: text: (In m ... share data)
+  item-69 at level 1: text: (Unaudited)
+  item-70 at level 1: table with [9x5]
+  item-71 at level 1: table with [14x5]
+  item-72 at level 1: text: (A) R ... ne 7, 2024.
+  item-73 at level 1: section_header: NVIDIA CORPORATION
+  item-74 at level 1: section_header: CONDE ... ANCE SHEETS
+  item-75 at level 1: text: (In millions)
+  item-76 at level 1: text: (Unaudited)
+  item-77 at level 1: table with [10x3]
+  item-78 at level 1: table with [17x3]
+  item-79 at level 1: section_header: NVIDI ...  CASH FLOWS
+  item-80 at level 1: text: (In millions)
+  item-81 at level 1: text: (Unaudited)
+  item-82 at level 1: table with [9x5]
+  item-83 at level 1: table with [31x5]
+  item-84 at level 1: table with [4x5]
+  item-85 at level 1: table with [23x6]
+  item-86 at level 1: table with [14x6]
+  item-87 at level 1: text: (A) A ... line items:
+  item-88 at level 1: table with [6x6]
+  item-89 at level 1: section_header: (B) S ...  following:
+  item-90 at level 1: table with [6x6]
+  item-91 at level 1: form_area: group group
+    item-92 at level 2: list_item: (C) O ... adjustments
+    item-93 at level 2: list_item: (D) I ... U 2016-09).
+    item-94 at level 2: list_item: (E) R ... une 7, 2024
+  item-95 at level 1: table with [4x2]
+  item-96 at level 1: section_header: About NVIDIA
+  item-97 at level 1: text: NVIDI ...  computing.
+  item-98 at level 1: text: Certa ... cumstances.
+  item-99 at level 1: text: © 202 ... out notice.
+  item-100 at level 1: key_value_area: group group
+    item-101 at level 2: text: Stewa ... @nvidia.com
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-1.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-2.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-3.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-4.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-5.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-6.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-7.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-8.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-9.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-10.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-11.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-12.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-13.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-14.html
+INFO:autogen.agents.experimental.document_agent.docling_query_engine:Loading input doc: /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025.md
+INFO:autogen.agents.experimental.document_agent.docling_doc_ingest_agent:data_ingest_task context_variables:
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_m109pZO6q5bINR9GqPRnyC3r) *****
+Data Ingestion Task Completed for ./docagent/NVIDIAQ3-2025.pdf
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_SrSWxCuhoQBs0ZXmg10UFJGH): transfer_TaskManagerAgent_to_QueryAgent *****
+Arguments: 
+{}
+********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_QueryAgent...
+Call ID: call_SrSWxCuhoQBs0ZXmg10UFJGH
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_SrSWxCuhoQBs0ZXmg10UFJGH) *****
+Swarm agent --> QueryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_3cFPKgzf63FdYn9twarT0saL): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_3cFPKgzf63FdYn9twarT0saL
+Input arguments: {'context_variables': {'CompletedTaskCount': 1, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_3cFPKgzf63FdYn9twarT0saL) *****
+NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also partnered with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are working with companies like Toyota and Ola Motors to build the next wave of physical AI.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_ZpAIN89uDHq4cOrWYt9ZhOiX): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_ZpAIN89uDHq4cOrWYt9ZhOiX
+Input arguments: {'context_variables': {'CompletedTaskCount': 2, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [{'query': 'What did NVIDIA do in regards to AI?', 'answer': 'NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also partnered with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are working with companies like Toyota and Ola Motors to build the next wave of physical AI.'}], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_ZpAIN89uDHq4cOrWYt9ZhOiX) *****
+The GAAP revenue for Q3 2025 was $35.1 billion.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+1. NVIDIA has been actively advancing AI by collaborating with companies like Foxconn to utilize digital twins and industrial AI for faster factory operations. They've partnered with leading manufacturers in India and Japan to automate workflows and enhance efficiency with NVIDIA AI and Omniverse. Additionally, they introduced Holoscan for Media, integrating AI into live media and video pipelines. In automotive and robotics, they developed tools for robot learning and humanoid development, collaborating with companies like Toyota and Ola Motors to create the next wave of physical AI.
+
+2. The GAAP revenue for Q3 2025 was $35.1 billion.
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_bZXrrvzDMRyY6sTWby09lJGd): transfer_TaskManagerAgent_to_SummaryAgent *****
+Arguments: 
+{}
+**********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_SummaryAgent...
+Call ID: call_bZXrrvzDMRyY6sTWby09lJGd
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_bZXrrvzDMRyY6sTWby09lJGd) *****
+Swarm agent --> SummaryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: SummaryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+SummaryAgent (to chat_manager):
+
+Summary of Completed Tasks:
+- Ingested the document: './docagent/NVIDIAQ3-2025.pdf'
+- Executed all queries successfully.
+
+Query and Answers:
+1. Query: What did NVIDIA do in regards to AI?  
+   Answer: NVIDIA has been actively advancing AI by collaborating with companies like Foxconn to utilize digital twins and industrial AI for faster factory operations. They've partnered with leading manufacturers in India and Japan to automate workflows and enhance efficiency with NVIDIA AI and Omniverse. Additionally, they introduced Holoscan for Media, integrating AI into live media and video pipelines. In automotive and robotics, they developed tools for robot learning and humanoid development, collaborating with companies like Toyota and Ola Motors to create the next wave of physical AI.
+
+2. Query: What was Q3 2025 GAAP revenue?  
+   Answer: The GAAP revenue for Q3 2025 was $35.1 billion.
+
+--------------------------------------------------------------------------------
+nvidia_agent (to chat_manager):
+
+Summary of Completed Tasks:
+- Ingested the document: './docagent/NVIDIAQ3-2025.pdf'
+- Executed all queries successfully.
+
+Query and Answers:
+1. Query: What did NVIDIA do in regards to AI?  
+   Answer: NVIDIA has been actively advancing AI by collaborating with companies like Foxconn to utilize digital twins and industrial AI for faster factory operations. They've partnered with leading manufacturers in India and Japan to automate workflows and enhance efficiency with NVIDIA AI and Omniverse. Additionally, they introduced Holoscan for Media, integrating AI into live media and video pipelines. In automotive and robotics, they developed tools for robot learning and humanoid development, collaborating with companies like Toyota and Ola Motors to create the next wave of physical AI.
+
+2. Query: What was Q3 2025 GAAP revenue?  
+   Answer: The GAAP revenue for Q3 2025 was $35.1 billion.
+
+--------------------------------------------------------------------------------
+
+Next speaker: financial_analyst
+
+
+>>>>>>>> USING AUTO REPLY...
+financial_analyst (to chat_manager):
+
+**Summary of Analysis:**
+
+**AMD Queries:**
+1. **What did AMD do in regards to AI?**  
+   - Expanded partnerships with companies like IBM, Vultr, Aleph Alpha, and Fujitsu to enhance AI infrastructure.
+   - Released ROCm 6.3 with performance enhancements for AMD Instinct accelerators.
+   - Introduced new processors, including the Ryzen AI PRO, for AI capabilities in Dell PCs.
+   - Released new Ryzen AI Max and Ryzen AI Max PRO Series processors to expand AI PC portfolio.
+   - Made strategic investments to advance the AI ecosystem and support solutions.
+
+2. **What was the Q4 2024 GAAP revenue?**  
+   - The GAAP revenue for Q4 2024 was $7.7 billion.
+
+**NVIDIA Queries:**
+1. **What did NVIDIA do in regards to AI?**  
+   - Collaborated with companies like Foxconn to utilize digital twins and industrial AI for improved factory operations.
+   - Partnered with leading manufacturers in India and Japan to automate workflows and improve efficiency using NVIDIA AI and Omniverse.
+   - Introduced Holoscan for Media, integrating AI into live media and video pipelines.
+   - Developed tools for robot learning and humanoid development in automotive and robotics sectors, working with companies like Toyota and Ola Motors.
+
+2. **What was Q3 2025 GAAP revenue?**  
+   - The GAAP revenue for Q3 2025 was $35.1 billion.
+
+Conclusion: Both AMD and NVIDIA have made significant advancements in AI, showing strong revenue figures for their respective report periods. The deeper integration of AI in their offerings reflects their commitment to leading in this technology sector. (This is not financial advice)
+
+--------------------------------------------------------------------------------
+
+Next speaker: nvidia_agent
+
+_User (to chat_manager):
+
+**Summary of Analysis:**
+
+**AMD Queries:**
+1. **What did AMD do in regards to AI?**  
+   - Expanded partnerships with companies like IBM, Vultr, Aleph Alpha, and Fujitsu to enhance AI infrastructure.
+   - Released ROCm 6.3 with performance enhancements for AMD Instinct accelerators.
+   - Introduced new processors, including the Ryzen AI PRO, for AI capabilities in Dell PCs.
+   - Released new Ryzen AI Max and Ryzen AI Max PRO Series processors to expand AI PC portfolio.
+   - Made strategic investments to advance the AI ecosystem and support solutions.
+
+2. **What was the Q4 2024 GAAP revenue?**  
+   - The GAAP revenue for Q4 2024 was $7.7 billion.
+
+**NVIDIA Queries:**
+1. **What did NVIDIA do in regards to AI?**  
+   - Collaborated with companies like Foxconn to utilize digital twins and industrial AI for improved factory operations.
+   - Partnered with leading manufacturers in India and Japan to automate workflows and improve efficiency using NVIDIA AI and Omniverse.
+   - Introduced Holoscan for Media, integrating AI into live media and video pipelines.
+   - Developed tools for robot learning and humanoid development in automotive and robotics sectors, working with companies like Toyota and Ola Motors.
+
+2. **What was Q3 2025 GAAP revenue?**  
+   - The GAAP revenue for Q3 2025 was $35.1 billion.
+
+Conclusion: Both AMD and NVIDIA have made significant advancements in AI, showing strong revenue figures for their respective report periods. The deeper integration of AI in their offerings reflects their commitment to leading in this technology sector. (This is not financial advice)
+
+--------------------------------------------------------------------------------
+
+Next speaker: DocumentTriageAgent
+
+DocumentTriageAgent (to chat_manager):
+
+{"ingestions":[],"queries":[{"query_type":"RAG_QUERY","query":"What did AMD do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was the Q4 2024 GAAP revenue?"},{"query_type":"RAG_QUERY","query":"What did NVIDIA do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was Q3 2025 GAAP revenue?"}]}
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_DjEcVf0ttzVx1fJ2hc4bRCan): initiate_tasks *****
+Arguments: 
+{"ingestions":[],"queries":[{"query_type":"RAG_QUERY","query":"What did AMD do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was the Q4 2024 GAAP revenue?"},{"query_type":"RAG_QUERY","query":"What did NVIDIA do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was Q3 2025 GAAP revenue?"}]}
+*******************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION initiate_tasks...
+Call ID: call_DjEcVf0ttzVx1fJ2hc4bRCan
+Input arguments: {'ingestions': [], 'queries': [{'query_type': 'RAG_QUERY', 'query': 'What did AMD do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}, {'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [], 'QueryResults': []}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_agent:initiate_tasks context_variables
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_DjEcVf0ttzVx1fJ2hc4bRCan) *****
+Updated context variables with task decisions
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_M3mJqx8UTINRIx9IKdWKovPm): transfer_TaskManagerAgent_to_QueryAgent *****
+Arguments: 
+{}
+********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_QueryAgent...
+Call ID: call_M3mJqx8UTINRIx9IKdWKovPm
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_M3mJqx8UTINRIx9IKdWKovPm) *****
+Swarm agent --> QueryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_5NeAk6dX9xsLIzTS4QHDInzP): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_5NeAk6dX9xsLIzTS4QHDInzP
+Input arguments: {'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What did AMD do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}, {'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_5NeAk6dX9xsLIzTS4QHDInzP) *****
+The provided information does not mention any actions or initiatives by AMD in regards to AI.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_dPI6MVs6SljZNO5ZwjvzPBgq): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_dPI6MVs6SljZNO5ZwjvzPBgq
+Input arguments: {'context_variables': {'CompletedTaskCount': 1, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}, {'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [{'query': 'What did AMD do in regards to AI?', 'answer': 'The provided information does not mention any actions or initiatives by AMD in regards to AI.'}], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_dPI6MVs6SljZNO5ZwjvzPBgq) *****
+The Q4 2024 GAAP revenue is not provided in the available information.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_xhmDgc10jxH1ytAzTEbExQnd): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_xhmDgc10jxH1ytAzTEbExQnd
+Input arguments: {'context_variables': {'CompletedTaskCount': 2, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [{'query': 'What did AMD do in regards to AI?', 'answer': 'The provided information does not mention any actions or initiatives by AMD in regards to AI.'}, {'query': 'What was the Q4 2024 GAAP revenue?', 'answer': 'The Q4 2024 GAAP revenue is not provided in the available information.'}], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_xhmDgc10jxH1ytAzTEbExQnd) *****
+NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also worked with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are supporting companies like Toyota and Ola Motors in building the next wave of physical AI.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_dh7OoYr7nhawN8jMdM5DsTBl): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_dh7OoYr7nhawN8jMdM5DsTBl
+Input arguments: {'context_variables': {'CompletedTaskCount': 3, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [{'query': 'What did AMD do in regards to AI?', 'answer': 'The provided information does not mention any actions or initiatives by AMD in regards to AI.'}, {'query': 'What was the Q4 2024 GAAP revenue?', 'answer': 'The Q4 2024 GAAP revenue is not provided in the available information.'}, {'query': 'What did NVIDIA do in regards to AI?', 'answer': 'NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also worked with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are supporting companies like Toyota and Ola Motors in building the next wave of physical AI.'}], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_dh7OoYr7nhawN8jMdM5DsTBl) *****
+The GAAP revenue for Q3 2025 was $35.1 billion.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+Here is the summarized information based on your queries:
+
+### AMD:
+1. **What did AMD do in regards to AI?**  
+   - No specific information regarding AMD's actions in relation to AI was provided.
+
+2. **What was the Q4 2024 GAAP revenue?**  
+   - The GAAP revenue for Q4 2024 is not specified.
+
+### NVIDIA:
+1. **What did NVIDIA do in regards to AI?**  
+   - Collaborated with companies like Foxconn to utilize digital twins and industrial AI for enhanced factory operations.
+   - Partnered with leading manufacturers in India and Japan to automate workflows and improve efficiency using NVIDIA AI and Omniverse.
+   - Introduced Holoscan for Media, which integrates AI into live media and video pipelines.
+   - Developed tools for robot learning and humanoid development in automotive and robotics sectors, collaborating with companies like Toyota and Ola Motors.
+
+2. **What was Q3 2025 GAAP revenue?**  
+   - The GAAP revenue for Q3 2025 was $35.1 billion.
+
+In conclusion, while specific actions by AMD regarding AI and its Q4 2024 revenue remain unclear, NVIDIA has showcased substantial advancements and collaborations in AI technology, along with strong revenue figures.
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_6vmHMvfVipcvnNwQdX4lbDkr): transfer_TaskManagerAgent_to_SummaryAgent *****
+Arguments: 
+{}
+**********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_SummaryAgent...
+Call ID: call_6vmHMvfVipcvnNwQdX4lbDkr
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_6vmHMvfVipcvnNwQdX4lbDkr) *****
+Swarm agent --> SummaryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: SummaryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+SummaryAgent (to chat_manager):
+
+### Summary of Completed Tasks:
+- Documents ingested: ['./docagent/NVIDIAQ3-2025.pdf']
+- Documents left to ingest: 0
+- Queries left to run: 0
+
+### Query and Answers:
+1. **Query:** What did AMD do in regards to AI?  
+   **Answer:** The provided information does not mention any actions or initiatives by AMD in regards to AI.
+
+2. **Query:** What was the Q4 2024 GAAP revenue?  
+   **Answer:** The Q4 2024 GAAP revenue is not provided in the available information.
+
+3. **Query:** What did NVIDIA do in regards to AI?  
+   **Answer:** NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also worked with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are supporting companies like Toyota and Ola Motors in building the next wave of physical AI.
+
+4. **Query:** What was Q3 2025 GAAP revenue?  
+   **Answer:** The GAAP revenue for Q3 2025 was $35.1 billion.
+
+### Conclusion:
+Both AMD and NVIDIA have made significant advancements in AI, showing strong revenue figures for their respective reporting periods. The deeper integration of AI in their offerings reflects their commitment to leading in this technology sector. (This is not financial advice)
+
+--------------------------------------------------------------------------------
+nvidia_agent (to chat_manager):
+
+### Summary of Completed Tasks:
+- Documents ingested: ['./docagent/NVIDIAQ3-2025.pdf']
+- Documents left to ingest: 0
+- Queries left to run: 0
+
+### Query and Answers:
+1. **Query:** What did AMD do in regards to AI?  
+   **Answer:** The provided information does not mention any actions or initiatives by AMD in regards to AI.
+
+2. **Query:** What was the Q4 2024 GAAP revenue?  
+   **Answer:** The Q4 2024 GAAP revenue is not provided in the available information.
+
+3. **Query:** What did NVIDIA do in regards to AI?  
+   **Answer:** NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also worked with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are supporting companies like Toyota and Ola Motors in building the next wave of physical AI.
+
+4. **Query:** What was Q3 2025 GAAP revenue?  
+   **Answer:** The GAAP revenue for Q3 2025 was $35.1 billion.
+
+### Conclusion:
+Both AMD and NVIDIA have made significant advancements in AI, showing strong revenue figures for their respective reporting periods. The deeper integration of AI in their offerings reflects their commitment to leading in this technology sector. (This is not financial advice)
+
+--------------------------------------------------------------------------------
+
+Next speaker: amd_agent
+
+_User (to chat_manager):
+
+### Summary of Completed Tasks:
+- Documents ingested: ['./docagent/NVIDIAQ3-2025.pdf']
+- Documents left to ingest: 0
+- Queries left to run: 0
+
+### Query and Answers:
+1. **Query:** What did AMD do in regards to AI?  
+   **Answer:** The provided information does not mention any actions or initiatives by AMD in regards to AI.
+
+2. **Query:** What was the Q4 2024 GAAP revenue?  
+   **Answer:** The Q4 2024 GAAP revenue is not provided in the available information.
+
+3. **Query:** What did NVIDIA do in regards to AI?  
+   **Answer:** NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also worked with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are supporting companies like Toyota and Ola Motors in building the next wave of physical AI.
+
+4. **Query:** What was Q3 2025 GAAP revenue?  
+   **Answer:** The GAAP revenue for Q3 2025 was $35.1 billion.
+
+### Conclusion:
+Both AMD and NVIDIA have made significant advancements in AI, showing strong revenue figures for their respective reporting periods. The deeper integration of AI in their offerings reflects their commitment to leading in this technology sector. (This is not financial advice)
+
+--------------------------------------------------------------------------------
+
+Next speaker: DocumentTriageAgent
+
+DocumentTriageAgent (to chat_manager):
+
+{"ingestions":[{"path_or_url":"./docagent/NVIDIAQ3-2025.pdf"}],"queries":[{"query_type":"RAG_QUERY","query":"What did AMD do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was the Q4 2024 GAAP revenue?"},{"query_type":"RAG_QUERY","query":"What did NVIDIA do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was Q3 2025 GAAP revenue?"}]}
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_OR07jUrmcaldgXpiAcrsrtWw): initiate_tasks *****
+Arguments: 
+{"ingestions":[{"path_or_url":"./docagent/NVIDIAQ3-2025.pdf"}],"queries":[{"query_type":"RAG_QUERY","query":"What did AMD do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was the Q4 2024 GAAP revenue?"},{"query_type":"RAG_QUERY","query":"What did NVIDIA do in regards to AI?"},{"query_type":"RAG_QUERY","query":"What was Q3 2025 GAAP revenue?"}]}
+*******************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION initiate_tasks...
+Call ID: call_OR07jUrmcaldgXpiAcrsrtWw
+Input arguments: {'ingestions': [{'path_or_url': './docagent/NVIDIAQ3-2025.pdf'}], 'queries': [{'query_type': 'RAG_QUERY', 'query': 'What did AMD do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}, {'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/AMDQ4-2024.pdf'], 'QueriesToRun': [], 'QueryResults': []}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_agent:initiate_tasks context_variables
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_OR07jUrmcaldgXpiAcrsrtWw) *****
+Updated context variables with task decisions
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_JV04YOCJJ6bllZPybTAQdtFL): transfer_TaskManagerAgent_to_DoclingDocIngestAgent *****
+Arguments: 
+{}
+*******************************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_DoclingDocIngestAgent...
+Call ID: call_JV04YOCJJ6bllZPybTAQdtFL
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_JV04YOCJJ6bllZPybTAQdtFL) *****
+Swarm agent --> DoclingDocIngestAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: DoclingDocIngestAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+DoclingDocIngestAgent (to chat_manager):
+
+***** Suggested tool call (call_tihIUtYp7W9XFb9H0reBLWkY): data_ingest_task *****
+Arguments: 
+{}
+*********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION data_ingest_task...
+Call ID: call_tihIUtYp7W9XFb9H0reBLWkY
+Input arguments: {'context_variables': {'CompletedTaskCount': 0, 'DocumentsToIngest': [{'path_or_url': './docagent/NVIDIAQ3-2025.pdf'}], 'DocumentsIngested': ['./docagent/AMDQ4-2024.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What did AMD do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}, {'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [], 'TaskInitiated': True}}
+```
+
+``` text
+INFO:autogen.agents.experimental.document_agent.document_utils:Error when checking if ./docagent/NVIDIAQ3-2025.pdf is a valid URL: Invalid URL.
+INFO:autogen.agents.experimental.document_agent.document_utils:Detected file. Returning file path...
+INFO:docling.document_converter:Going to convert document batch...
+INFO:docling.utils.accelerator_utils:Accelerator device: 'cpu'
+INFO:docling.utils.accelerator_utils:Accelerator device: 'cpu'
+INFO:docling.pipeline.base_pipeline:Processing document NVIDIAQ3-2025.pdf
+INFO:docling.document_converter:Finished converting document NVIDIAQ3-2025.pdf in 22.11 sec.
+INFO:autogen.agents.experimental.document_agent.parser_utils:Document converted in 22.11 seconds.
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Document NVIDIAQ3-2025.pdf converted.
+Saved markdown output to: /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:item-0 at level 0: unspecified: group _root_
+  item-1 at level 1: picture
+  item-2 at level 1: section_header: NVIDI ... Fiscal 2025
+  item-3 at level 1: list: group list
+    item-4 at level 2: list_item: Recor ...  a year ago
+    item-5 at level 2: list_item: Recor ...  a year ago
+  item-6 at level 1: text: SANTA ... a year ago.
+  item-7 at level 1: text: For t ... a year ago.
+  item-8 at level 1: text: 'The  ...  inference.
+  item-9 at level 1: text: 'AI i ... ,' he said.
+  item-10 at level 1: text: NVIDI ... er 5, 2024.
+  item-11 at level 1: section_header: Q3 Fi ... 025 Summary
+  item-12 at level 1: table with [8x6]
+  item-13 at level 1: table with [8x6]
+  item-14 at level 1: text: *All  ... ne 7, 2024.
+  item-15 at level 1: section_header: Outlook
+  item-16 at level 1: text: NVIDI ... as follows:
+  item-17 at level 1: list: group list
+    item-18 at level 2: list_item: Reven ... r minus 2%.
+    item-19 at level 2: list_item: GAAP  ... sis points.
+    item-20 at level 2: list_item: GAAP  ... spectively.
+    item-21 at level 2: list_item: GAAP  ... 00 million,
+  item-22 at level 1: text: exclu ... securities.
+  item-23 at level 1: list: group list
+    item-24 at level 2: list_item: GAAP  ... rete items.
+  item-25 at level 1: section_header: Highlights
+  item-26 at level 1: text: NVIDI ... hese areas:
+  item-27 at level 1: section_header: Data Center
+  item-28 at level 1: list: group list
+    item-29 at level 2: list_item: Third ... a year ago.
+    item-30 at level 2: list_item: Annou ... oming soon.
+    item-31 at level 2: list_item: Launc ... networking.
+    item-32 at level 2: list_item: Intro ...  of AI-RAN.
+    item-33 at level 2: list_item: Annou ...  AI Aerial.
+    item-34 at level 2: list_item: Revea ... e software.
+    item-35 at level 2: list_item: Accel ... g platform.
+    item-36 at level 2: list_item: Unvei ...  Blackwell.
+    item-37 at level 2: list_item: Annou ... benchmarks.
+    item-38 at level 2: list_item: Contr ...  standards.
+    item-39 at level 2: list_item: Revea ...  worldwide.
+    item-40 at level 2: list_item: Annou ... e software.
+  item-41 at level 1: section_header: Gaming and AI PC
+  item-42 at level 1: list: group list
+    item-43 at level 2: list_item: Third ... a year ago.
+    item-44 at level 2: list_item: Celeb ... ven future.
+    item-45 at level 2: list_item: Demon ... t Gamescom.
+    item-46 at level 2: list_item: Intro ... Veilguard .
+    item-47 at level 2: list_item: Began ... xt quarter.
+  item-48 at level 1: section_header: Profe ... sualization
+  item-49 at level 1: list: group list
+    item-50 at level 2: list_item: Third ... a year ago.
+    item-51 at level 2: list_item: Annou ... Superchips.
+    item-52 at level 2: list_item: Revea ... operations.
+    item-53 at level 2: list_item: Unvei ... n delivery.
+  item-54 at level 1: section_header: Autom ... nd Robotics
+  item-55 at level 1: list: group list
+    item-56 at level 2: list_item: Third ... a year ago.
+    item-57 at level 2: list_item: Revea ...  computing.
+    item-58 at level 2: list_item: Intro ... developers.
+    item-59 at level 2: list_item: Annou ... hysical AI.
+  item-60 at level 1: section_header: CFO Commentary
+  item-61 at level 1: text: Comme ... nvidia.com.
+  item-62 at level 1: section_header: Confe ... Information
+  item-63 at level 1: text: NVIDI ... iscal 2025.
+  item-64 at level 1: section_header: Non-GAAP Measures
+  item-65 at level 1: text: To su ...  companies.
+  item-66 at level 1: section_header: NVIDIA CORPORATION
+  item-67 at level 1: section_header: CONDE ... S OF INCOME
+  item-68 at level 1: text: (In m ... share data)
+  item-69 at level 1: text: (Unaudited)
+  item-70 at level 1: table with [9x5]
+  item-71 at level 1: table with [14x5]
+  item-72 at level 1: text: (A) R ... ne 7, 2024.
+  item-73 at level 1: section_header: NVIDIA CORPORATION
+  item-74 at level 1: section_header: CONDE ... ANCE SHEETS
+  item-75 at level 1: text: (In millions)
+  item-76 at level 1: text: (Unaudited)
+  item-77 at level 1: table with [10x3]
+  item-78 at level 1: table with [17x3]
+  item-79 at level 1: section_header: NVIDI ...  CASH FLOWS
+  item-80 at level 1: text: (In millions)
+  item-81 at level 1: text: (Unaudited)
+  item-82 at level 1: table with [9x5]
+  item-83 at level 1: table with [31x5]
+  item-84 at level 1: table with [4x5]
+  item-85 at level 1: table with [23x6]
+  item-86 at level 1: table with [14x6]
+  item-87 at level 1: text: (A) A ... line items:
+  item-88 at level 1: table with [6x6]
+  item-89 at level 1: section_header: (B) S ...  following:
+  item-90 at level 1: table with [6x6]
+  item-91 at level 1: form_area: group group
+    item-92 at level 2: list_item: (C) O ... adjustments
+    item-93 at level 2: list_item: (D) I ... U 2016-09).
+    item-94 at level 2: list_item: (E) R ... une 7, 2024
+  item-95 at level 1: table with [4x2]
+  item-96 at level 1: section_header: About NVIDIA
+  item-97 at level 1: text: NVIDI ...  computing.
+  item-98 at level 1: text: Certa ... cumstances.
+  item-99 at level 1: text: © 202 ... out notice.
+  item-100 at level 1: key_value_area: group group
+    item-101 at level 2: text: Stewa ... @nvidia.com
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-1.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-2.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-3.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-4.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-5.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-6.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-7.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-8.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-9.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-10.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-11.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-12.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-13.html
+DEBUG:autogen.agents.experimental.document_agent.parser_utils:Saving HTML table to /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025-table-14.html
+INFO:autogen.agents.experimental.document_agent.docling_query_engine:Loading input doc: /home/papagame/projects/wgong/AG2/ag2/notebook/parsed_docs/NVIDIAQ3-2025.md
+INFO:autogen.agents.experimental.document_agent.docling_doc_ingest_agent:data_ingest_task context_variables:
+```
+
+``` text
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_tihIUtYp7W9XFb9H0reBLWkY) *****
+Data Ingestion Task Completed for ./docagent/NVIDIAQ3-2025.pdf
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_Tb3UXcdd1vqa45qp0aBG9Ezw): transfer_TaskManagerAgent_to_QueryAgent *****
+Arguments: 
+{}
+********************************************************************************************************
+***** Suggested tool call (call_rfXeaVCrambXV7LPaIuIM8oF): transfer_TaskManagerAgent_to_QueryAgent *****
+Arguments: 
+{}
+********************************************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_QueryAgent...
+Call ID: call_Tb3UXcdd1vqa45qp0aBG9Ezw
+Input arguments: {}
+
+>>>>>>>> EXECUTING FUNCTION transfer_TaskManagerAgent_to_QueryAgent...
+Call ID: call_rfXeaVCrambXV7LPaIuIM8oF
+Input arguments: {}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_Tb3UXcdd1vqa45qp0aBG9Ezw) *****
+Swarm agent --> QueryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+***** Response from calling tool (call_rfXeaVCrambXV7LPaIuIM8oF) *****
+Swarm agent --> QueryAgent
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_J20upM4xKNH1UvCB9zsyFRjz): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_J20upM4xKNH1UvCB9zsyFRjz
+Input arguments: {'context_variables': {'CompletedTaskCount': 1, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/AMDQ4-2024.pdf', './docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What did AMD do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}, {'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_J20upM4xKNH1UvCB9zsyFRjz) *****
+AMD expanded its partnerships and investments to enhance AI infrastructure and solutions. They collaborated with companies like IBM, Vultr, Aleph Alpha, and Fujitsu to deploy AMD Instinct MI300X accelerators for AI and HPC applications. AMD also released ROCm 6.3 with performance enhancements and shared plans for its 2025 ROCm software stack. Additionally, AMD introduced new Ryzen AI processors for various computing needs and extended its leadership in high-performance computing with projects like the El Capitan and Hunter supercomputers.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_y5tPWd5D7Xs8dZzXbKBjfs1W): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_y5tPWd5D7Xs8dZzXbKBjfs1W
+Input arguments: {'context_variables': {'CompletedTaskCount': 2, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/AMDQ4-2024.pdf', './docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What was the Q4 2024 GAAP revenue?'}, {'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [{'query': 'What did AMD do in regards to AI?', 'answer': 'AMD expanded its partnerships and investments to enhance AI infrastructure and solutions. They collaborated with companies like IBM, Vultr, Aleph Alpha, and Fujitsu to deploy AMD Instinct MI300X accelerators for AI and HPC applications. AMD also released ROCm 6.3 with performance enhancements and shared plans for its 2025 ROCm software stack. Additionally, AMD introduced new Ryzen AI processors for various computing needs and extended its leadership in high-performance computing with projects like the El Capitan and Hunter supercomputers.'}], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_y5tPWd5D7Xs8dZzXbKBjfs1W) *****
+The Q4 2024 GAAP revenue was $7.7 billion.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_NQaAXQwXJFxqdtzDWc6QibKu): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_NQaAXQwXJFxqdtzDWc6QibKu
+Input arguments: {'context_variables': {'CompletedTaskCount': 3, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/AMDQ4-2024.pdf', './docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What did NVIDIA do in regards to AI?'}, {'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [{'query': 'What did AMD do in regards to AI?', 'answer': 'AMD expanded its partnerships and investments to enhance AI infrastructure and solutions. They collaborated with companies like IBM, Vultr, Aleph Alpha, and Fujitsu to deploy AMD Instinct MI300X accelerators for AI and HPC applications. AMD also released ROCm 6.3 with performance enhancements and shared plans for its 2025 ROCm software stack. Additionally, AMD introduced new Ryzen AI processors for various computing needs and extended its leadership in high-performance computing with projects like the El Capitan and Hunter supercomputers.'}, {'query': 'What was the Q4 2024 GAAP revenue?', 'answer': 'The Q4 2024 GAAP revenue was $7.7 billion.'}], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_NQaAXQwXJFxqdtzDWc6QibKu) *****
+NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also worked with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are working with companies like Toyota and Ola Motors to build the next wave of physical AI.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+***** Suggested tool call (call_G6bSP93imTsD8GB4tLFziCrP): execute_rag_query *****
+Arguments: 
+{}
+**********************************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: _Swarm_Tool_Executor
+
+
+>>>>>>>> EXECUTING FUNCTION execute_rag_query...
+Call ID: call_G6bSP93imTsD8GB4tLFziCrP
+Input arguments: {'context_variables': {'CompletedTaskCount': 4, 'DocumentsToIngest': [], 'DocumentsIngested': ['./docagent/AMDQ4-2024.pdf', './docagent/NVIDIAQ3-2025.pdf'], 'QueriesToRun': [{'query_type': 'RAG_QUERY', 'query': 'What was Q3 2025 GAAP revenue?'}], 'QueryResults': [{'query': 'What did AMD do in regards to AI?', 'answer': 'AMD expanded its partnerships and investments to enhance AI infrastructure and solutions. They collaborated with companies like IBM, Vultr, Aleph Alpha, and Fujitsu to deploy AMD Instinct MI300X accelerators for AI and HPC applications. AMD also released ROCm 6.3 with performance enhancements and shared plans for its 2025 ROCm software stack. Additionally, AMD introduced new Ryzen AI processors for various computing needs and extended its leadership in high-performance computing with projects like the El Capitan and Hunter supercomputers.'}, {'query': 'What was the Q4 2024 GAAP revenue?', 'answer': 'The Q4 2024 GAAP revenue was $7.7 billion.'}, {'query': 'What did NVIDIA do in regards to AI?', 'answer': 'NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also worked with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are working with companies like Toyota and Ola Motors to build the next wave of physical AI.'}], 'TaskInitiated': True}}
+_Swarm_Tool_Executor (to chat_manager):
+
+***** Response from calling tool (call_G6bSP93imTsD8GB4tLFziCrP) *****
+The GAAP revenue for Q3 2025 was $35.1 billion.
+**********************************************************************
+
+--------------------------------------------------------------------------------
+
+Next speaker: QueryAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+QueryAgent (to chat_manager):
+
+### Summary of Completed Tasks:
+- **Documents ingested:** ['./docagent/NVIDIAQ3-2025.pdf']
+- **Documents left to ingest:** 0
+- **Queries left to run:** 0
+
+### Query and Answers:
+1. **Query:** What did AMD do in regards to AI?  
+   **Answer:** AMD expanded its partnerships and investments to enhance AI infrastructure and solutions. They collaborated with companies like IBM, Vultr, Aleph Alpha, and Fujitsu to deploy AMD Instinct MI300X accelerators for AI and HPC applications. AMD also released ROCm 6.3 with performance enhancements and shared plans for its 2025 ROCm software stack. Additionally, AMD introduced new Ryzen AI processors for various computing needs and extended its leadership in high-performance computing with projects like the El Capitan and Hunter supercomputers.
+
+2. **Query:** What was the Q4 2024 GAAP revenue?  
+   **Answer:** The Q4 2024 GAAP revenue was $7.7 billion.
+
+3. **Query:** What did NVIDIA do in regards to AI?  
+   **Answer:** NVIDIA has been actively involved in advancing AI by collaborating with companies like Foxconn to use digital twins and industrial AI for faster factory operations. They have also worked with leading industrial manufacturers in India and Japan to automate workflows and enhance operational efficiency using NVIDIA AI and Omniverse. Additionally, NVIDIA introduced Holoscan for Media, a platform that integrates AI with live media and video pipelines. In the automotive and robotics sectors, they have developed AI and simulation tools for robot learning and humanoid development, and are supporting companies like Toyota and Ola Motors in building the next wave of physical AI.
+
+4. **Query:** What was Q3 2025 GAAP revenue?  
+   **Answer:** The GAAP revenue for Q3 2025 was $35.1 billion.
+
+### Conclusion:
+Both AMD and NVIDIA have made significant advancements in AI, showing strong revenue figures for their respective reporting periods. The deeper integration of AI in their offerings reflects their commitment to leading in this technology sector. (This is not financial advice)
+
+--------------------------------------------------------------------------------
+
+Next speaker: TaskManagerAgent
+
+
+>>>>>>>> USING AUTO REPLY...
+TaskManagerAgent (to chat_manager):
+
+***** Suggested tool call (call_9nY4ikhDYTCk46P2SHHekzNL): transfer_TaskManagerAgent_to_SummaryAgent *****
+Arguments: 
+{}
+**********************************************************************************************************
+
+--------------------------------------------------------------------------------
+amd_agent (to chat_manager):
+
+
+Document Agent failed to perform task.
+
+
+--------------------------------------------------------------------------------
+
+Next speaker: financial_analyst
+
+
+>>>>>>>> USING AUTO REPLY...
+financial_analyst (to chat_manager):
+
+**Errors:**
+- The AMD agent's query returns indicate that no information was provided regarding AMD's actions in AI or the Q4 2024 GAAP revenue, which contradicts the expected outputs previously discussed.
+
+**Conclusion:**
+Failed to receive necessary data from the AMD agent. Please check the document or system functionality. TERMINATE.
+
+--------------------------------------------------------------------------------
+```
+
+### Tips for DocAgent
+
+-   When asking for information from ingested information, be precise.
+    For example, asking for revenue for the quarter in the previous
+    example could retrieve a number of different revenue values, so we
+    ask for “GAAP revenue” for the specific quarter.
+-   If you have ingested documents in previous runs and just need to
+    query the information, be clear to the DocAgent that they don’t need
+    to ingest documents you refer to.
+-   Ensure that any files to be ingested can be accessed by the process
+    you are running.
+-   Ingestions take time, be sure to use `collection_name` to reuse
+    collections that have already had the documents ingested in to.
+-   You can review the Markdown files ingested in the `parsed_docs`
+    folder to see how effective the conversion to Markdown was. This
+    will help you investigate any query issues.
+
+<div className="edit-url-container">
+    <a className="edit-url" href="https://github.com/ag2ai/ag2/edit/main/notebook/agents_docagent_u8hi.ipynb" target='_blank'><Icon icon="pen" iconType="solid" size="13px"/> Edit this page</a>
+</div>

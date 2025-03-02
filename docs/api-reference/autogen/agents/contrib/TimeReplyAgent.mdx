@@ -307,7 +307,7 @@ a_initiate_chat(
     clear_history: bool = True,
     silent: bool | None = False,
     cache: AbstractCache | None = None,
-    max_turns: int | None = None,
+    max_turns: int | None = 3,
     summary_method: str | Callable[..., Any] | None = 'last_msg',
     summary_args: dict[str, Any] | None = {},
     message: str | Callable[..., Any] | None = None,
@@ -324,7 +324,7 @@ a_initiate_chat(
 | `clear_history` | **Type:** bool<br/><br/>**Default:** True |
 | `silent` | **Type:** bool \| None<br/><br/>**Default:** False |
 | `cache` | **Type:** [AbstractCache](/docs/api-reference/autogen/cache/AbstractCache) \| None<br/><br/>**Default:** None |
-| `max_turns` | **Type:** int \| None<br/><br/>**Default:** None |
+| `max_turns` | **Type:** int \| None<br/><br/>**Default:** 3 |
 | `summary_method` | **Type:** str \| Callable[..., Any] \| None<br/><br/>**Default:** 'last_msg' |
 | `summary_args` | **Type:** dict[str, typing.Any] \| None<br/><br/>**Default:** \{} |
 | `message` | **Type:** str \| Callable[..., Any] \| None<br/><br/>**Default:** None |
@@ -372,7 +372,7 @@ a_run(
     *,
     tools: Tool | Iterable[Tool] | None = None,
     executor_kwargs: dict[str, Any] | None = None,
-    max_turns: int | None = None,
+    max_turns: int | None = 3,
     msg_to: Literal['agent', 'user'] = 'agent',
     clear_history: bool = False,
     user_input: bool = True,
@@ -388,7 +388,7 @@ a_run(
 | `message` | the message to be processed.<br/><br/>**Type:** str |
 | `tools` | the tools to be used by the agent.<br/><br/>**Type:** [Tool](/docs/api-reference/autogen/tools/Tool) \| Iterable[[Tool](/docs/api-reference/autogen/tools/Tool)] \| None<br/><br/>**Default:** None |
 | `executor_kwargs` | the keyword arguments for the executor.<br/><br/>**Type:** dict[str, typing.Any] \| None<br/><br/>**Default:** None |
-| `max_turns` | maximum number of turns (a turn is equivalent to both agents having replied), defaults no None which means unlimited.<br/><br/>The original message is included.<br/><br/>**Type:** int \| None<br/><br/>**Default:** None |
+| `max_turns` | maximum number of turns (a turn is equivalent to both agents having replied), defaults no None which means unlimited.<br/><br/>The original message is included.<br/><br/>**Type:** int \| None<br/><br/>**Default:** 3 |
 | `msg_to` | which agent is receiving the message and will be the first to reply, defaults to the agent.<br/><br/>**Type:** Literal['agent', 'user']<br/><br/>**Default:** 'agent' |
 | `clear_history` | whether to clear the chat history.<br/><br/>**Type:** bool<br/><br/>**Default:** False |
 | `user_input` | the user will be asked for input at their turn.<br/><br/>**Type:** bool<br/><br/>**Default:** True |
@@ -797,7 +797,7 @@ initiate_chat(
     clear_history: bool = True,
     silent: bool | None = False,
     cache: AbstractCache | None = None,
-    max_turns: int | None = None,
+    max_turns: int | None = 3,
     summary_method: str | Callable[..., Any] | None = 'last_msg',
     summary_args: dict[str, Any] | None = {},
     message: dict[str, Any] | str | Callable[..., Any] | None = None,
@@ -814,7 +814,7 @@ initiate_chat(
 | `clear_history` | whether to clear the chat history with the agent.<br/><br/>Default is True.<br/><br/>**Type:** bool<br/><br/>**Default:** True |
 | `silent` | (Experimental) whether to print the messages for this conversation.<br/><br/>Default is False.<br/><br/>**Type:** bool \| None<br/><br/>**Default:** False |
 | `cache` | the cache client to be used for this conversation.<br/><br/>Default is None.<br/><br/>**Type:** [AbstractCache](/docs/api-reference/autogen/cache/AbstractCache) \| None<br/><br/>**Default:** None |
-| `max_turns` | the maximum number of turns for the chat between the two agents.<br/><br/>One turn means one conversation round trip.<br/><br/>Note that this is different from [max_consecutive_auto_reply](#max-consecutive-auto-reply) which is the maximum number of consecutive auto replies; and it is also different from [max_rounds in GroupChat](./groupchat) which is the maximum number of rounds in a group chat session.<br/><br/>If max_turns is set to None, the chat will continue until a termination condition is met.<br/><br/>Default is None.<br/><br/>**Type:** int \| None<br/><br/>**Default:** None |
+| `max_turns` | the maximum number of turns for the chat between the two agents.<br/><br/>One turn means one conversation round trip.<br/><br/>Note that this is different from [max_consecutive_auto_reply](#max-consecutive-auto-reply) which is the maximum number of consecutive auto replies; and it is also different from [max_rounds in GroupChat](./groupchat) which is the maximum number of rounds in a group chat session.<br/><br/>If max_turns is set to None, the chat will continue until a termination condition is met.<br/><br/>Default is None.<br/><br/>**Type:** int \| None<br/><br/>**Default:** 3 |
 | `summary_method` | a method to get a summary from the chat.<br/><br/>Default is DEFAULT_SUMMARY_METHOD, i.e., "last_msg".<br/><br/>**Type:** str \| Callable[..., Any] \| None<br/><br/>**Default:** 'last_msg' |
 | `summary_args` | a dictionary of arguments to be passed to the summary_method.<br/><br/>One example key is "summary_prompt", and value is a string of text used to prompt a LLM-based agent (the sender or recipient agent) to reflect on the conversation and extract a summary when summary_method is "reflection_with_llm".<br/><br/>The default summary_prompt is DEFAULT_SUMMARY_PROMPT, i.e., "Summarize takeaway from the conversation.<br/><br/>Do not add any introductory phrases.<br/><br/>If the intended request is NOT properly addressed, please point it out." Another available key is "summary_role", which is the role of the message sent to the agent in charge of summarizing.<br/><br/>Default is "system".<br/><br/>**Type:** dict[str, typing.Any] \| None<br/><br/>**Default:** \{} |
 | `message` | the initial message to be sent to the recipient.<br/><br/>Needs to be provided.<br/><br/>Otherwise, input() will be called to get the initial message.<br/><br/>- If a string or a dict is provided, it will be used as the initial message.<br/><br/>`generate_init_message` is called to generate the initial message for the agent based on this string and the context.<br/><br/>If dict, it may contain the following reserved fields (either content or tool_calls need to be provided).<br/><br/>1. "content": content of the message, can be None.<br/><br/>2. "function_call": a dictionary containing the function name and arguments.<br/><br/>(deprecated in favor of "tool_calls") 3. "tool_calls": a list of dictionaries containing the function name and arguments.<br/><br/>4. "role": role of the message, can be "assistant", "user", "function".<br/><br/>This field is only needed to distinguish between "function" or "assistant"/"user".<br/><br/>5. "name": In most cases, this field is not needed.<br/><br/>When the role is "function", this field is needed to indicate the function name.<br/><br/>6. "context" (dict): the context of the message, which will be passed to [OpenAIWrapper.create](/docs/api-reference/autogen/OpenAIWrapper#create).<br/><br/>- If a callable is provided, it will be called to get the initial message in the form of a string or a dict.<br/><br/>If the returned type is dict, it may contain the reserved fields mentioned above.<br/><br/>Example of a callable message (returning a string): ```python<br/><br/>**Type:** dict[str, typing.Any] \| str \| Callable[..., Any] \| None<br/><br/>**Default:** None |
@@ -1240,7 +1240,7 @@ run(
     *,
     tools: Tool | Iterable[Tool] | None = None,
     executor_kwargs: dict[str, Any] | None = None,
-    max_turns: int | None = None,
+    max_turns: int | None = 3,
     msg_to: Literal['agent', 'user'] = 'agent',
     clear_history: bool = False,
     user_input: bool = True,
@@ -1256,7 +1256,7 @@ run(
 | `message` | the message to be processed.<br/><br/>**Type:** str |
 | `tools` | the tools to be used by the agent.<br/><br/>**Type:** [Tool](/docs/api-reference/autogen/tools/Tool) \| Iterable[[Tool](/docs/api-reference/autogen/tools/Tool)] \| None<br/><br/>**Default:** None |
 | `executor_kwargs` | the keyword arguments for the executor.<br/><br/>**Type:** dict[str, typing.Any] \| None<br/><br/>**Default:** None |
-| `max_turns` | maximum number of turns (a turn is equivalent to both agents having replied), defaults no None which means unlimited.<br/><br/>The original message is included.<br/><br/>**Type:** int \| None<br/><br/>**Default:** None |
+| `max_turns` | maximum number of turns (a turn is equivalent to both agents having replied), defaults no None which means unlimited.<br/><br/>The original message is included.<br/><br/>**Type:** int \| None<br/><br/>**Default:** 3 |
 | `msg_to` | which agent is receiving the message and will be the first to reply, defaults to the agent.<br/><br/>**Type:** Literal['agent', 'user']<br/><br/>**Default:** 'agent' |
 | `clear_history` | whether to clear the chat history.<br/><br/>**Type:** bool<br/><br/>**Default:** False |
 | `user_input` | the user will be asked for input at their turn.<br/><br/>**Type:** bool<br/><br/>**Default:** True |
