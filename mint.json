@@ -125,7 +125,20 @@
                 "docs/user-guide/basic-concepts/orchestration/ending-a-chat"
               ]
             },
-            "docs/user-guide/basic-concepts/tools"
+            {
+              "group": "Tools",
+              "pages": [
+                "docs/user-guide/basic-concepts/tools/tools",
+                {
+                  "group": "Experimental",
+                  "pages": [
+                    "docs/user-guide/basic-concepts/tools/experimental/browser-use",
+                    "docs/user-guide/basic-concepts/tools/experimental/crawl4ai",
+                    "docs/user-guide/basic-concepts/tools/experimental/deep-research"
+                  ]
+                }
+              ]
+            }
           ]
         },
         {
@@ -409,11 +422,9 @@
             "docs/api-reference/autogen/ON_CONDITION",
             "docs/api-reference/autogen/OnCondition",
             "docs/api-reference/autogen/OpenAIWrapper",
-            "docs/api-reference/autogen/ReasoningAgent",
             "docs/api-reference/autogen/SenderRequiredError",
             "docs/api-reference/autogen/SwarmAgent",
             "docs/api-reference/autogen/SwarmResult",
-            "docs/api-reference/autogen/ThinkNode",
             "docs/api-reference/autogen/UPDATE_SYSTEM_MESSAGE",
             "docs/api-reference/autogen/UndefinedNextAgentError",
             "docs/api-reference/autogen/UpdateSystemMessage",
@@ -431,7 +442,6 @@
             "docs/api-reference/autogen/initiate_swarm_chat",
             "docs/api-reference/autogen/register_function",
             "docs/api-reference/autogen/register_hand_off",
-            "docs/api-reference/autogen/visualize_tree",
             {
               "group": "agentchat",
               "pages": [
@@ -1014,15 +1024,7 @@
                       "group": "rag",
                       "pages": [
                         "docs/api-reference/autogen/agentchat/contrib/rag/overview",
-                        "docs/api-reference/autogen/agentchat/contrib/rag/VectorDbQueryEngine"
-                      ]
-                    },
-                    {
-                      "group": "reasoning_agent",
-                      "pages": [
-                        "docs/api-reference/autogen/agentchat/contrib/reasoning_agent/overview",
-                        "docs/api-reference/autogen/agentchat/contrib/reasoning_agent/extract_rlhf_preference_dataset",
-                        "docs/api-reference/autogen/agentchat/contrib/reasoning_agent/extract_sft_dataset"
+                        "docs/api-reference/autogen/agentchat/contrib/rag/RAGQueryEngine"
                       ]
                     },
                     {
@@ -1242,20 +1244,26 @@
                     "docs/api-reference/autogen/agents/experimental/DiscordAgent",
                     "docs/api-reference/autogen/agents/experimental/DocAgent",
                     "docs/api-reference/autogen/agents/experimental/DoclingDocIngestAgent",
+                    "docs/api-reference/autogen/agents/experimental/InMemoryQueryEngine",
+                    "docs/api-reference/autogen/agents/experimental/ReasoningAgent",
                     "docs/api-reference/autogen/agents/experimental/SlackAgent",
                     "docs/api-reference/autogen/agents/experimental/TelegramAgent",
+                    "docs/api-reference/autogen/agents/experimental/ThinkNode",
+                    "docs/api-reference/autogen/agents/experimental/VectorChromaQueryEngine",
                     "docs/api-reference/autogen/agents/experimental/WebSurferAgent",
                     {
                       "group": "document_agent",
                       "pages": [
                         "docs/api-reference/autogen/agents/experimental/document_agent/overview",
+                        "docs/api-reference/autogen/agents/experimental/document_agent/InMemoryQueryEngine",
+                        "docs/api-reference/autogen/agents/experimental/document_agent/VectorChromaQueryEngine",
                         "docs/api-reference/autogen/agents/experimental/document_agent/docling_parse_docs",
                         "docs/api-reference/autogen/agents/experimental/document_agent/handle_input",
                         {
-                          "group": "docling_query_engine",
+                          "group": "chroma_query_engine",
                           "pages": [
-                            "docs/api-reference/autogen/agents/experimental/document_agent/docling_query_engine/overview",
-                            "docs/api-reference/autogen/agents/experimental/document_agent/docling_query_engine/DoclingMdQueryEngine"
+                            "docs/api-reference/autogen/agents/experimental/document_agent/chroma_query_engine/overview",
+                            "docs/api-reference/autogen/agents/experimental/document_agent/chroma_query_engine/VectorChromaQueryEngine"
                           ]
                         },
                         {
@@ -1266,6 +1274,15 @@
                             "docs/api-reference/autogen/agents/experimental/document_agent/document_utils/is_url",
                             "docs/api-reference/autogen/agents/experimental/document_agent/document_utils/list_files",
                             "docs/api-reference/autogen/agents/experimental/document_agent/document_utils/preprocess_path"
+                          ]
+                        },
+                        {
+                          "group": "inmemory_query_engine",
+                          "pages": [
+                            "docs/api-reference/autogen/agents/experimental/document_agent/inmemory_query_engine/overview",
+                            "docs/api-reference/autogen/agents/experimental/document_agent/inmemory_query_engine/DocumentStore",
+                            "docs/api-reference/autogen/agents/experimental/document_agent/inmemory_query_engine/InMemoryQueryEngine",
+                            "docs/api-reference/autogen/agents/experimental/document_agent/inmemory_query_engine/QueryAnswer"
                           ]
                         }
                       ]

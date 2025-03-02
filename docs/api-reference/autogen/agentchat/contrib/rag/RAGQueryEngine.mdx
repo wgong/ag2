@@ -1,17 +1,17 @@
 ---
-sidebarTitle: VectorDbQueryEngine
-title: autogen.agentchat.contrib.rag.VectorDbQueryEngine
+sidebarTitle: RAGQueryEngine
+title: autogen.agentchat.contrib.rag.RAGQueryEngine
 ---
-<h2 id="autogen.agentchat.contrib.rag.VectorDbQueryEngine" class="doc doc-heading">
+<h2 id="autogen.agentchat.contrib.rag.RAGQueryEngine" class="doc doc-heading">
     <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>
-    <span class="doc doc-object-name doc-class-name">VectorDbQueryEngine</span>
+    <span class="doc doc-object-name doc-class-name">RAGQueryEngine</span>
 </h2>
 
 ```python
-VectorDbQueryEngine(*args, **kwargs)
+RAGQueryEngine(*args, **kwargs)
 ```
 
-    An abstract base class that represents a query engine on top of an underlying vector database.<br/>This interface defines the basic methods for RAG.
+    A protocol class that represents a document ingestation and query engine on top of an underlying database.<br/>This interface defines the basic methods for RAG.
 
 <b>Parameters:</b>
 | Name | Description |
@@ -22,25 +22,25 @@ VectorDbQueryEngine(*args, **kwargs)
 ### Instance Methods
 
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>
-#### add_records
+#### add_docs
 
 ```python
-add_records(
+add_docs(
     self,
     new_doc_dir: Path | str | None = None,
-    new_doc_paths_or_urls: list[Path | str] | None = None,
+    new_doc_paths: list[Path | str] | None = None,
     *args: Any,
     **kwargs: Any
-) -> bool
+) -> None
 ```
 
-    Add new documents to the underlying database and add to the index.
+    Add new documents to the underlying data store.
 
 <b>Parameters:</b>
 | Name | Description |
 |--|--|
 | `new_doc_dir` | **Type:** pathlib.Path \| str \| None<br/><br/>**Default:** None |
-| `new_doc_paths_or_urls` | **Type:** list[pathlib.Path \| str] \| None<br/><br/>**Default:** None |
+| `new_doc_paths` | **Type:** list[pathlib.Path \| str] \| None<br/><br/>**Default:** None |
 | `*args` | **Type:** Any |
 | `**kwargs` | **Type:** Any |
 
