@@ -11,6 +11,14 @@ see https://docs.ag2.ai/docs/user-guide/reference-agents/index
 
 ##### [Captain Agent](https://docs.ag2.ai/docs/user-guide/reference-agents/captainagent)
 
+```bash
+pip install -e ".[openai,captainagent]"   # use CaptainAgent
+pip install ag2==0.8.0b1
+```
+
+##### [WebSurfer Agent](https://docs.ag2.ai/docs/user-guide/reference-agents/websurferagent)
+- [Crawl4AI Tool](https://docs.ag2.ai/docs/use-cases/notebooks/notebooks/tools_crawl4ai)
+- [browser-use Tool](https://docs.ag2.ai/docs/use-cases/notebooks/notebooks/tools_browser_use)
 
 ##### [Communication Agent](https://docs.ag2.ai/docs/user-guide/reference-agents/communication-agents)
 
