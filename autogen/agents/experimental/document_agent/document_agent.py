@@ -11,19 +11,21 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel, Field
 
 from .... import Agent, ConversableAgent, UpdateSystemMessage
+from ....agentchat.contrib.rag.query_engine import RAGQueryEngine
 from ....agentchat.contrib.swarm_agent import (
     AfterWork,
     AfterWorkOption,
     OnCondition,
+    OnContextCondition,
     SwarmResult,
     initiate_swarm_chat,
     register_hand_off,
 )
+from ....agentchat.utils import ContextExpression
 from ....doc_utils import export_module
 from ....oai.client import OpenAIWrapper
 from .chroma_query_engine import VectorChromaQueryEngine
 from .docling_doc_ingest_agent import DoclingDocIngestAgent
-from .inmemory_query_engine import InMemoryQueryEngine
 
 __all__ = ["DocAgent"]
 
@@ -36,7 +38,7 @@ DEFAULT_SYSTEM_MESSAGE = """
 """
 TASK_MANAGER_NAME = "TaskManagerAgent"
 TASK_MANAGER_SYSTEM_MESSAGE = """
-    You are a task manager agent. You can do one of 4 tasks:
+    You are a task manager agent. You have 2 priorities:
     1. You initiate the tasks which updates the context variables based on the task decisions (DocumentTask) from the DocumentTriageAgent.
     If the DocumentTriageAgent has suggested any ingestions or queries, call initiate_tasks to record them.
     Put all ingestion and query tasks into the one tool call.
@@ -60,9 +62,7 @@ TASK_MANAGER_SYSTEM_MESSAGE = """
                 }
             ]
         }
-    2. You hand off control to the ingest agent if there are any documents to ingest.
-    3. If there are no documents to ingest and there are queries to run, hand control off to the query agent.
-    4. If there are no documents to ingest and no queries to run, hand control off to the summary agent.
+    2. If there are no documents to ingest and no queries to run, hand control off to the summary agent.
 
     Put all file paths and URLs into the ingestions. A http/https URL is also a valid path and should be ingested.
 
@@ -70,10 +70,9 @@ TASK_MANAGER_SYSTEM_MESSAGE = """
 
     New ingestations and queries may be raised from time to time, so use the initiate_tasks again if you see new ingestions/queries.
 
-    Use tools to transfer to the ingest agent, query agent, or summary agent based on the context variables.
-
-    IF CALLING A TOOL, ONLY CALL TOOLS ONCE IN YOUR ENTIRE RESPONSE.
+    Transfer to the summary agent if all ingestion and query tasks are done.
     """
+
 DEFAULT_ERROR_SWARM_MESSAGE: str = """
 Document Agent failed to perform task.
 """
@@ -107,6 +106,30 @@ class DocumentTask(BaseModel):
     ingestions: list[Ingest] = Field(description="The list of documents to ingest.")
     queries: list[Query] = Field(description="The list of queries to perform.")
 
+    def format(self) -> str:
+        """Format the DocumentTask as a string for the TaskManager to work with."""
+        if len(self.ingestions) == 0 and len(self.queries) == 0:
+            return "There were no ingestion or query tasks detected."
+
+        instructions = "Tasks:\n\n"
+        order = 1
+
+        if len(self.ingestions) > 0:
+            instructions += "Ingestions:\n"
+            for ingestion in self.ingestions:
+                instructions += f"{order}: {ingestion.path_or_url}\n"
+                order += 1
+
+            instructions += "\n"
+
+        if len(self.queries) > 0:
+            instructions += "Queries:\n"
+            for query in self.queries:
+                instructions += f"{order}: {query.query}\n"
+                order += 1
+
+        return instructions
+
 
 class DocumentTriageAgent(ConversableAgent):
     """The DocumentTriageAgent is responsible for deciding what type of task to perform from user requests."""
@@ -119,10 +142,12 @@ class DocumentTriageAgent(ConversableAgent):
         super().__init__(
             name="DocumentTriageAgent",
             system_message=(
-                "You are a document triage agent."
-                "You are responsible for deciding what type of task to perform from a user's request and populating a DocumentTask formatted response."
-                "If the user specifies files or URLs, add them as individual 'ingestions' to DocumentTask."
-                "Add the user's questions about the files/URLs as individual 'RAG_QUERY' queries to the 'query' list in the DocumentTask. Don't make up questions, keep it as concise and close to the user's request as possible."
+                "You are a document triage agent. "
+                "You are responsible for deciding what type of task to perform from a user's request and populating a DocumentTask formatted response. "
+                "If the user specifies files or URLs, add them as individual 'ingestions' to DocumentTask. "
+                "You can access external websites if given a URL, so put them in as ingestions. "
+                "Add the user's questions about the files/URLs as individual 'RAG_QUERY' queries to the 'query' list in the DocumentTask. "
+                "Don't make up questions, keep it as concise and close to the user's request as possible."
             ),
             human_input_mode="NEVER",
             llm_config=structured_config_list,
@@ -144,7 +169,7 @@ class DocAgent(ConversableAgent):
         system_message: Optional[str] = None,
         parsed_docs_path: Optional[Union[str, Path]] = None,
         collection_name: Optional[str] = None,
-        query_engine: Optional[Union[VectorChromaQueryEngine, InMemoryQueryEngine]] = None,
+        query_engine: Optional[RAGQueryEngine] = None,
     ):
         """Initialize the DocAgent.
 
@@ -154,6 +179,7 @@ class DocAgent(ConversableAgent):
             system_message (Optional[str]): The system message for the DocAgent.
             parsed_docs_path (Union[str, Path]): The path where parsed documents will be stored.
             collection_name (Optional[str]): The unique name for the data store collection. If omitted, a random name will be used. Populate this to reuse previous ingested data.
+            query_engine (Optional[RAGQueryEngine]): The query engine to use for querying documents, defaults to VectorChromaQueryEngine if none provided.
 
         The DocAgent is responsible for generating a group of agents to solve a task.
 
@@ -171,6 +197,7 @@ class DocAgent(ConversableAgent):
         system_message = system_message or DEFAULT_SYSTEM_MESSAGE
         parsed_docs_path = parsed_docs_path or "./parsed_docs"
 
+        # Default Query Engine will be ChromaDB
         if query_engine is None:
             query_engine = VectorChromaQueryEngine(collection_name=collection_name)
 
@@ -289,6 +316,9 @@ class DocAgent(ConversableAgent):
 
             system_message = (
                 "You are a summary agent and you provide a summary of all completed tasks and the list of queries and their answers. "
+                "Output two sections: 'Ingestions:' and 'Queries:' with the results of the tasks. Number the ingestions and queries. "
+                "If there are no ingestions output 'No ingestions', if there are no queries output 'No queries' under their respective sections. "
+                "Don't add markdown formatting. "
                 "Format the Query and Answers as 'Query:\nAnswer:'. Add a number to each query if more than one. Use the context below:\n"
                 f"Documents ingested: {agent.get_context('DocumentsIngested')}\n"
                 f"Documents left to ingest: {len(agent.get_context('DocumentsToIngest'))}\n"
@@ -308,8 +338,8 @@ class DocAgent(ConversableAgent):
             logger.debug("has_ingest_tasks context_variables:", agent._context_variables)
             return len(agent.get_context("DocumentsToIngest")) > 0
 
-        def has_query_tasks(agent: ConversableAgent, messages: list[dict[str, Any]]) -> bool:
-            logger.debug("has_query_tasks context_variables:", agent._context_variables)
+        def has_only_query_tasks(agent: ConversableAgent, messages: list[dict[str, Any]]) -> bool:
+            logger.debug("has_only_query_tasks context_variables:", agent._context_variables)
             if len(agent.get_context("DocumentsToIngest")) > 0:
                 return False
             return len(agent.get_context("QueriesToRun")) > 0
@@ -324,19 +354,23 @@ class DocAgent(ConversableAgent):
         register_hand_off(
             agent=self._task_manager_agent,
             hand_to=[
-                OnCondition(
-                    self._data_ingestion_agent,
-                    "If there are any DocumentsToIngest in context variables, transfer to data ingestion agent",
-                    available=has_ingest_tasks,
+                OnContextCondition(  # Go straight to data ingestion agent if we have documents to ingest
+                    target=self._data_ingestion_agent,
+                    condition=ContextExpression("len(${DocumentsToIngest}) > 0"),
                 ),
-                OnCondition(
-                    self._query_agent,
-                    "If there are any QueriesToRun in context variables and no DocumentsToIngest, transfer to query_agent",
-                    available=has_query_tasks,
+                OnContextCondition(  # Go to Query agent if we have queries to run (ingestion above run first)
+                    target=self._query_agent,
+                    condition=ContextExpression("len(${QueriesToRun}) > 0"),
+                ),
+                OnContextCondition(  # Go to Summary agent if no documents or queries left to run and we have query results
+                    target=self._summary_agent,
+                    condition=ContextExpression(
+                        "len(${DocumentsToIngest}) == 0 and len(${QueriesToRun}) == 0 and len(${QueryResults}) > 0"
+                    ),
                 ),
                 OnCondition(
                     self._summary_agent,
-                    "Call this function as work is done and a summary will be created",
+                    "Call this function if all work is done and a summary will be created",
                     available=summary_task,
                 ),
                 AfterWork(AfterWorkOption.STAY),
@@ -382,6 +416,7 @@ class DocAgent(ConversableAgent):
         sender: Optional[Agent] = None,
         config: Optional[OpenAIWrapper] = None,
     ) -> tuple[bool, Optional[Union[str, dict[str, Any]]]]:
+        """Reply function that generates the inner swarm reply for the DocAgent."""
         context_variables = {
             "CompletedTaskCount": 0,
             "DocumentsToIngest": [],
@@ -414,6 +449,7 @@ class DocAgent(ConversableAgent):
         return True, chat_result.summary
 
     def _get_document_input_message(self, messages: Optional[Union[list[dict[str, Any]], str]]) -> str:  # type: ignore[type-arg]
+        """Gets and validates the input message(s) for the document agent."""
         if isinstance(messages, str):
             return messages
         elif (
